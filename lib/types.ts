@@ -29,17 +29,25 @@ export interface Category {
 /** @deprecated use Category */
 export type ExpenseCategory = Category;
 
-export interface CategoryTransfer {
+/** A movement of money between two wallets. It is excluded from income and expense totals. */
+export interface WalletTransfer {
   id: string;
   amount: number;
-  fromCategoryId: string;
-  toCategoryId: string;
+  fromWalletId: string;
+  toWalletId: string;
   note?: string;
   date: string;
   createdAt: number;
   expenseTxnId?: string;
   incomeTxnId?: string;
+  /** Kept only while reading pre-wallet-transfer records. */
+  fromCategoryId?: string;
+  /** Kept only while reading pre-wallet-transfer records. */
+  toCategoryId?: string;
 }
+
+/** @deprecated use WalletTransfer */
+export type CategoryTransfer = WalletTransfer;
 
 export interface SavingsGoal {
   target: number;

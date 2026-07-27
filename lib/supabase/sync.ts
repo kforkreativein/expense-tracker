@@ -1,4 +1,4 @@
-import { Transaction, Wallet, Category, CategoryTransfer, RecurringRule, SavingsGoal, SplitGroup } from '../types';
+import { Transaction, Wallet, Category, WalletTransfer, RecurringRule, SavingsGoal, SplitGroup } from '../types';
 import { getSupabase } from './client';
 
 function getUserId(): string | null {
@@ -26,7 +26,7 @@ function writeLocal(userId: string, data: {
   transactions: Transaction[];
   wallets: Wallet[];
   categories: Category[];
-  transfers: CategoryTransfer[];
+  transfers: WalletTransfer[];
   recurring: RecurringRule[];
   splits: SplitGroup[];
   goal: SavingsGoal | null;
@@ -69,7 +69,7 @@ function readLocal(userId: string) {
     transactions: parse<Transaction[]>('money_buddy_txns', []),
     wallets: parse<Wallet[]>('money_buddy_wallets', DEFAULT_WALLETS),
     categories: parse<Category[]>('money_buddy_categories', []),
-    transfers: parse<CategoryTransfer[]>('money_buddy_transfers', []),
+    transfers: parse<WalletTransfer[]>('money_buddy_transfers', []),
     recurring: parse<RecurringRule[]>('money_buddy_recurring', []),
     splits: parse<SplitGroup[]>('money_buddy_splits', []),
     goal: parse<SavingsGoal | null>('money_buddy_savings_goal', null),
@@ -81,7 +81,7 @@ function readLocal(userId: string) {
 function hasMeaningfulData(data: {
   transactions: Transaction[];
   categories: Category[];
-  transfers: CategoryTransfer[];
+  transfers: WalletTransfer[];
   recurring: RecurringRule[];
   splits: SplitGroup[];
   goal: SavingsGoal | null;
@@ -155,11 +155,13 @@ export async function pullFromCloud(): Promise<boolean> {
     walletId: r.wallet_id ?? undefined,
   }));
 
-  const transfers: CategoryTransfer[] = (trRes.data ?? []).map(r => ({
+  const transfers: WalletTransfer[] = (trRes.data ?? []).map(r => ({
     id: r.id,
     amount: r.amount,
-    fromCategoryId: r.from_category_id,
-    toCategoryId: r.to_category_id,
+    fromWalletId: r.from_wallet_id ?? '',
+    toWalletId: r.to_wallet_id ?? '',
+    fromCategoryId: r.from_category_id ?? undefined,
+    toCategoryId: r.to_category_id ?? undefined,
     note: r.note ?? undefined,
     date: r.date,
     createdAt: r.created_at,
@@ -376,8 +378,10 @@ export async function pushToCloud(): Promise<boolean> {
         id: t.id,
         user_id: userId,
         amount: t.amount,
-        from_category_id: t.fromCategoryId,
-        to_category_id: t.toCategoryId,
+        from_category_id: t.fromCategoryId ?? null,
+        to_category_id: t.toCategoryId ?? null,
+        from_wallet_id: t.fromWalletId,
+        to_wallet_id: t.toWalletId,
         note: t.note ?? null,
         date: t.date,
         created_at: t.createdAt,

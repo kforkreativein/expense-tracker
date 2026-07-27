@@ -1,17 +1,18 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Transaction, Category, CategoryTransfer, SplitGroup } from '@/lib/types';
-import { getTransactions, addTransaction, updateTransaction, deleteTransaction } from '@/lib/storage';
+import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
+import { getTransactions, addTransaction, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
 import { getSplitGroups, groupNetTotal, adjustForSettledSplits } from '@/lib/splits';
 import { getSplitEnabled } from '@/lib/settings';
 import { applyDueRecurring } from '@/lib/recurring';
 import { userStorageKey, restoreAuth } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { getCategories } from '@/lib/categories';
-import { getTransfers } from '@/lib/transfers';
+import { getTransfers, migrateTransfersToWallets } from '@/lib/transfers';
 import { recordDailyVisit } from '@/lib/streak';
 import { filterTransactionsForView, ViewMode } from '@/lib/view';
 import { registerServiceWorker, notificationsEnabled, showNotification } from '@/lib/notifications';
+import { applyTheme, getTheme } from '@/lib/theme';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
 import ProfileHeader from '@/components/ProfileHeader';
@@ -31,7 +32,7 @@ import SplitTab from '@/components/SplitTab';
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [transfers, setTransfers] = useState<CategoryTransfer[]>([]);
+  const [transfers, setTransfers] = useState<WalletTransfer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -79,7 +80,10 @@ export default function Home() {
   const categoryFilter = viewMode === 'all' ? null : viewMode;
 
   const loadAppData = useCallback(() => {
+    applyTheme(getTheme());
     registerServiceWorker();
+    migrateTransactionsToWallets();
+    migrateTransfersToWallets();
     const added = applyDueRecurring();
     if (added > 0) setRecurringAdded(added);
     refresh();
@@ -127,6 +131,7 @@ export default function Home() {
   }, [loadAppData]);
 
   const handleLogout = useCallback(() => {
+    applyTheme('light');
     setAuthenticated(false);
     setTransactions([]);
     setTransfers([]);
@@ -159,7 +164,7 @@ export default function Home() {
   }, [refresh]);
 
   if (authenticated === null) {
-    return <main className="min-h-dvh" style={{ background: '#FFF7ED' }} />;
+    return <main className="min-h-dvh bg-[var(--app-bg)]" />;
   }
 
   if (!authenticated) {
@@ -167,7 +172,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh overflow-x-hidden" style={{ background: '#FFF7ED' }}>
+    <main className="min-h-dvh overflow-x-hidden bg-[var(--app-bg)]">
       <div
         className="max-w-md mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col gap-3"
         style={{ paddingBottom: 'max(5rem, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
@@ -282,7 +287,6 @@ export default function Home() {
           transfers={transfers}
           categories={categories}
           viewMode={viewMode}
-          onViewMode={setViewMode}
           walletFilter={walletFilter}
           onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
           budget={budget}
@@ -297,7 +301,7 @@ export default function Home() {
       {showForm && (
         <div
           className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-pop-in"
-          style={{ background: 'rgba(28,25,23,0.55)' }}
+          style={{ background: 'var(--overlay-bg)' }}
           onClick={() => setShowForm(false)}>
           <div
             className="w-full max-w-sm max-h-[92dvh] overflow-y-auto rounded-t-[24px] sm:rounded-[24px]"

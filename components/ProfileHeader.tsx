@@ -54,7 +54,7 @@ export default function ProfileHeader({ streak, onLogout, onOpenSettings }: Prop
     <>
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(28,25,23,0.55)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowModal(false)}>
           <div
             className="clay animate-bounce-in w-full max-w-sm p-7 flex flex-col items-center gap-5 text-center"
@@ -96,7 +96,7 @@ export default function ProfileHeader({ streak, onLogout, onOpenSettings }: Prop
               backgroundPosition: 'center',
               backgroundSize: 'cover',
             }}
-            className="h-[52px] w-[52px] shrink-0 rounded-[18px] shadow-[5px_5px_12px_rgba(0,0,0,0.10),-3px_-3px_8px_rgba(255,255,255,0.85)]"
+            className="h-[52px] w-[52px] shrink-0 rounded-[18px] shadow-[var(--surface-shadow)]"
           />
           <div>
             <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">{getGreeting()}</p>

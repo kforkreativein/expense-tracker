@@ -262,7 +262,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
 
       {error && <p className="text-red-500 font-bold text-sm text-center">{error}</p>}
 
-      <div className="flex gap-2 mt-1 sticky bottom-0 bg-gradient-to-t from-[#f0ede8] to-transparent pt-2 pb-1">
+      <div className="flex gap-2 mt-1 sticky bottom-0 bg-gradient-to-t from-[var(--input-sticky)] to-transparent pt-2 pb-1">
         {onCancel && (
           <button type="button" onClick={onCancel}
             className="clay clay-btn flex-1 py-3.5 font-bold text-stone-500 text-base min-h-[48px]">

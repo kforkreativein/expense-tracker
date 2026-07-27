@@ -22,7 +22,6 @@ interface Props {
   transfers: CategoryTransfer[];
   categories: Category[];
   viewMode: ViewMode;
-  onViewMode: (mode: ViewMode) => void;
   walletFilter: string | null;
   onWalletFilter: (id: string) => void;
   budget: number;
@@ -36,7 +35,7 @@ interface Props {
 export default function MoreSection(props: Props) {
   const [open, setOpen] = useState(false);
   const {
-    transactions, viewTransactions, transfers, categories, viewMode, onViewMode,
+    transactions, viewTransactions, transfers, categories, viewMode,
     walletFilter, onWalletFilter, budget, onSetBudget, onRefresh, recurringRefresh,
     onTransfer, onTransferUndo,
   } = props;
@@ -70,8 +69,8 @@ export default function MoreSection(props: Props) {
           {viewMode === 'all' && (
             <CategoryBreakdown transactions={transactions} transfers={transfers} categories={categories} />
           )}
-          <CategoryTransferPanel categories={categories} onTransfer={onTransfer} />
-          <TransferHistory categories={categories} onUndo={onTransferUndo} />
+          <CategoryTransferPanel onTransfer={onTransfer} />
+          <TransferHistory onUndo={onTransferUndo} />
           <YearEndReport transactions={transactions} transfers={transfers} categories={categories} />
         </div>
       )}

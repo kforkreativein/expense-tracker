@@ -1,23 +1,19 @@
 'use client';
 import { useState } from 'react';
-import { Category, CategoryTransfer } from '@/lib/types';
-import { getCategoryById } from '@/lib/categories';
+import { WalletTransfer } from '@/lib/types';
 import { getWallets } from '@/lib/wallets';
-import { getTransfers, undoCategoryTransfer } from '@/lib/transfers';
+import { getTransfers, undoWalletTransfer } from '@/lib/transfers';
 import { fmt } from '@/lib/insights';
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-interface Props {
-  categories: Category[];
-  onUndo: () => void;
-}
+interface Props { onUndo: () => void; }
 
-export default function TransferHistory({ categories, onUndo }: Props) {
+export default function TransferHistory({ onUndo }: Props) {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<CategoryTransfer[]>([]);
+  const [items, setItems] = useState<WalletTransfer[]>([]);
   const wallets = getWallets();
 
   function reload() {
@@ -32,12 +28,10 @@ export default function TransferHistory({ categories, onUndo }: Props) {
   }
 
   function handleUndo(id: string) {
-    undoCategoryTransfer(id);
+    undoWalletTransfer(id);
     reload();
     onUndo();
   }
-
-  if (categories.length < 2) return null;
 
   return (
     <div className="clay flex flex-col">
@@ -54,24 +48,19 @@ export default function TransferHistory({ categories, onUndo }: Props) {
             <p className="text-sm font-semibold text-stone-400 text-center py-3">No transfers yet.</p>
           ) : (
             items.slice(0, 20).map(t => {
-              const from = getCategoryById(t.fromCategoryId);
-              const to = getCategoryById(t.toCategoryId);
-              const fromWallet = from?.walletId ? wallets.find(w => w.id === from.walletId) : null;
-              const toWallet = to?.walletId ? wallets.find(w => w.id === to.walletId) : null;
-              const walletNote = fromWallet && toWallet && t.expenseTxnId
-                ? `${fromWallet.name} → ${toWallet.name}`
-                : null;
+              const fromWallet = wallets.find(w => w.id === t.fromWalletId);
+              const toWallet = wallets.find(w => w.id === t.toWalletId);
 
               return (
                 <div key={t.id} className="clay p-3 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-black text-stone-800">
-                      {from?.emoji} {from?.name ?? '?'} → {to?.emoji} {to?.name ?? '?'}
+                      {fromWallet?.emoji ?? '💳'} {fromWallet?.name ?? 'Unknown wallet'} → {toWallet?.emoji ?? '💳'} {toWallet?.name ?? 'Unknown wallet'}
                     </span>
                     <span className="text-sm font-black text-violet-700">{fmt(t.amount)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-stone-400">{fmtDate(t.date)}{walletNote ? ` · ${walletNote}` : ''}</span>
+                    <span className="text-xs font-semibold text-stone-400">{fmtDate(t.date)}</span>
                     <button
                       type="button"
                       onClick={() => handleUndo(t.id)}

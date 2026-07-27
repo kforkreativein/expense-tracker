@@ -49,11 +49,11 @@ export default function AuthScreen({ onAuth }: Props) {
   }
 
   if (!ready) {
-    return <div className="min-h-dvh" style={{ background: '#FFF7ED' }} />;
+    return <div className="min-h-dvh bg-[var(--app-bg)]" />;
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center p-4" style={{ background: '#FFF7ED' }}>
+    <div className="min-h-dvh flex items-center justify-center p-4 bg-[var(--app-bg)]">
       <div className="clay animate-bounce-in w-full max-w-sm p-7 flex flex-col gap-5">
         <div className="text-center">
           <span
@@ -63,7 +63,7 @@ export default function AuthScreen({ onAuth }: Props) {
               backgroundPosition: 'center',
               backgroundSize: 'cover',
             }}
-            className="inline-block h-16 w-16 rounded-[20px] shadow-[5px_5px_12px_rgba(0,0,0,0.10),-3px_-3px_8px_rgba(255,255,255,0.85)]"
+            className="inline-block h-16 w-16 rounded-[20px] shadow-[var(--surface-shadow)]"
           />
           <h1 className="text-2xl font-black text-stone-800 mt-3">Money Buddy</h1>
           <p className="text-sm font-semibold text-stone-500 mt-1">

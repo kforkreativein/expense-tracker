@@ -1,9 +1,33 @@
 @import "tailwindcss";
 
+:root {
+  --app-bg: #FFF7ED;
+  --app-text: #1c1917;
+  --surface: linear-gradient(145deg, #ffffff, #f0ede8);
+  --surface-solid: #ffffff;
+  --surface-muted: #f5f5f4;
+  --surface-border: rgba(255,255,255,0.65);
+  --surface-shadow: 5px 5px 10px rgba(0,0,0,0.10), -3px -3px 8px rgba(255,255,255,0.85);
+  --overlay-bg: rgba(28,25,23,0.55);
+  --input-sticky: #f0ede8;
+}
+
+html[data-theme='dark'] {
+  --app-bg: #171717;
+  --app-text: #f5f5f4;
+  --surface: linear-gradient(145deg, #303030, #202020);
+  --surface-solid: #282828;
+  --surface-muted: #242424;
+  --surface-border: rgba(255,255,255,0.10);
+  --surface-shadow: 7px 7px 16px rgba(0,0,0,0.42), -2px -2px 8px rgba(255,255,255,0.04);
+  --overlay-bg: rgba(0,0,0,0.72);
+  --input-sticky: #202020;
+}
+
 body {
   font-family: 'Nunito', sans-serif;
-  background-color: #FFF7ED;
-  color: #1c1917;
+  background-color: var(--app-bg);
+  color: var(--app-text);
   min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -17,9 +41,9 @@ body {
 /* ── Claymorphism base ── */
 .clay {
   border-radius: 20px;
-  background: linear-gradient(145deg, #ffffff, #f0ede8);
-  box-shadow: 5px 5px 10px rgba(0,0,0,0.10), -3px -3px 8px rgba(255,255,255,0.85);
-  border: 2px solid rgba(255,255,255,0.65);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
+  border: 2px solid var(--surface-border);
 }
 .clay-green {
   background: linear-gradient(145deg, #6ee7b7, #34d399);
@@ -57,6 +81,53 @@ body {
   border: 2px solid rgba(255,255,255,0.55);
   border-radius: 20px;
 }
+
+html[data-theme='dark'] .clay-green { background: linear-gradient(145deg, #16644e, #0f4b3a); border-color: rgba(110,231,183,0.20); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(110,231,183,0.05); }
+html[data-theme='dark'] .clay-red { background: linear-gradient(145deg, #7f3035, #542126); border-color: rgba(252,165,165,0.16); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(252,165,165,0.04); }
+html[data-theme='dark'] .clay-blue { background: linear-gradient(145deg, #285883, #1c3e60); border-color: rgba(147,197,253,0.18); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(147,197,253,0.04); }
+html[data-theme='dark'] .clay-yellow { background: linear-gradient(145deg, #805f18, #59400d); border-color: rgba(253,230,138,0.16); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(253,230,138,0.04); }
+html[data-theme='dark'] .clay-purple { background: linear-gradient(145deg, #56407f, #3b2a61); border-color: rgba(196,181,253,0.18); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(196,181,253,0.04); }
+html[data-theme='dark'] .clay-amber { background: linear-gradient(145deg, #805025, #593517); border-color: rgba(254,215,170,0.16); box-shadow: 5px 5px 12px rgba(0,0,0,0.35), -2px -2px 8px rgba(254,215,170,0.04); }
+
+/* Tailwind color utilities are used throughout the existing app. These overrides keep every
+   established component readable without changing its product-specific semantics. */
+html[data-theme='dark'] .bg-white, html[data-theme='dark'] .bg-white\/70 { background-color: var(--surface-solid); }
+html[data-theme='dark'] .bg-stone-50, html[data-theme='dark'] .bg-stone-100 { background-color: var(--surface-muted); }
+html[data-theme='dark'] .bg-stone-200 { background-color: #383838; }
+html[data-theme='dark'] .bg-violet-50, html[data-theme='dark'] .bg-violet-100 { background-color: #30264a; }
+html[data-theme='dark'] .bg-emerald-50, html[data-theme='dark'] .bg-emerald-100 { background-color: #173d32; }
+html[data-theme='dark'] .bg-rose-50, html[data-theme='dark'] .bg-rose-100 { background-color: #48262b; }
+html[data-theme='dark'] .bg-amber-50, html[data-theme='dark'] .bg-amber-100 { background-color: #493719; }
+html[data-theme='dark'] .bg-blue-50, html[data-theme='dark'] .bg-blue-100 { background-color: #1d3851; }
+html[data-theme='dark'] .from-teal-50 { --tw-gradient-from: #173f3d var(--tw-gradient-from-position); --tw-gradient-to: rgb(23 63 61 / 0) var(--tw-gradient-to-position); }
+html[data-theme='dark'] .from-violet-50 { --tw-gradient-from: #30264a var(--tw-gradient-from-position); --tw-gradient-to: rgb(48 38 74 / 0) var(--tw-gradient-to-position); }
+html[data-theme='dark'] .from-emerald-50 { --tw-gradient-from: #173d32 var(--tw-gradient-from-position); --tw-gradient-to: rgb(23 61 50 / 0) var(--tw-gradient-to-position); }
+html[data-theme='dark'] .from-blue-50 { --tw-gradient-from: #1d3851 var(--tw-gradient-from-position); --tw-gradient-to: rgb(29 56 81 / 0) var(--tw-gradient-to-position); }
+html[data-theme='dark'] .from-rose-50 { --tw-gradient-from: #48262b var(--tw-gradient-from-position); --tw-gradient-to: rgb(72 38 43 / 0) var(--tw-gradient-to-position); }
+html[data-theme='dark'] .to-white { --tw-gradient-to: #282828 var(--tw-gradient-to-position); }
+html[data-theme='dark'] .border-stone-100, html[data-theme='dark'] .border-stone-200 { border-color: #454545; }
+html[data-theme='dark'] .border-violet-100, html[data-theme='dark'] .border-violet-200 { border-color: #66528b; }
+html[data-theme='dark'] .border-emerald-100, html[data-theme='dark'] .border-emerald-200 { border-color: #31745c; }
+html[data-theme='dark'] .border-rose-100, html[data-theme='dark'] .border-rose-200 { border-color: #85434b; }
+html[data-theme='dark'] .border-amber-100, html[data-theme='dark'] .border-amber-200 { border-color: #87692d; }
+html[data-theme='dark'] .text-stone-900, html[data-theme='dark'] .text-stone-800 { color: #f5f5f4; }
+html[data-theme='dark'] .text-stone-700 { color: #e7e5e4; }
+html[data-theme='dark'] .text-stone-600 { color: #d6d3d1; }
+html[data-theme='dark'] .text-stone-500 { color: #c3c0bd; }
+html[data-theme='dark'] .text-stone-400 { color: #aaa6a2; }
+html[data-theme='dark'] .text-stone-300 { color: #928d89; }
+html[data-theme='dark'] .text-violet-900, html[data-theme='dark'] .text-violet-800 { color: #e5ddff; }
+html[data-theme='dark'] .text-violet-700, html[data-theme='dark'] .text-violet-600 { color: #c7b6ff; }
+html[data-theme='dark'] .text-emerald-900, html[data-theme='dark'] .text-emerald-800 { color: #c5f6df; }
+html[data-theme='dark'] .text-emerald-700, html[data-theme='dark'] .text-emerald-600 { color: #8ce4bd; }
+html[data-theme='dark'] .text-rose-900, html[data-theme='dark'] .text-rose-800 { color: #ffd5d7; }
+html[data-theme='dark'] .text-rose-700, html[data-theme='dark'] .text-rose-600, html[data-theme='dark'] .text-rose-500 { color: #ffb4ba; }
+html[data-theme='dark'] .text-blue-900, html[data-theme='dark'] .text-blue-800 { color: #d3ebff; }
+html[data-theme='dark'] .text-blue-700, html[data-theme='dark'] .text-blue-600 { color: #a9d8ff; }
+html[data-theme='dark'] .text-amber-900, html[data-theme='dark'] .text-amber-800 { color: #ffe5ae; }
+html[data-theme='dark'] .text-amber-700, html[data-theme='dark'] .text-amber-600 { color: #f9cf7b; }
+html[data-theme='dark'] ::placeholder { color: #aaa6a2; }
+html[data-theme='dark'] input[type="date"] { color-scheme: dark; }
 
 /* ── Animations ── */
 @keyframes fall {

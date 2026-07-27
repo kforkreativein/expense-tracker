@@ -309,7 +309,7 @@ export default function TransactionList({
       {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          style={{ background: 'rgba(28,25,23,0.55)', backdropFilter: 'blur(4px)', paddingBottom: 'max(0px, env(safe-area-inset-bottom))' }}
+          style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)', paddingBottom: 'max(0px, env(safe-area-inset-bottom))' }}
           onClick={e => { if (e.target === e.currentTarget) setEditing(null); }}>
           <div className="w-full max-w-sm animate-slide-up max-h-[92dvh] overflow-y-auto rounded-t-[24px] sm:rounded-[24px]">
             <TransactionForm

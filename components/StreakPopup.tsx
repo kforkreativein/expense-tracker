@@ -16,7 +16,7 @@ export default function StreakPopup({ previousStreak, streak, onDone }: Props) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-pop-in"
-      style={{ background: 'rgba(28,25,23,0.45)' }}
+      style={{ background: 'var(--overlay-bg)' }}
       onClick={onDone}
       role="dialog"
       aria-live="polite">

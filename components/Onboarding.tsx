@@ -41,7 +41,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(28,25,23,0.55)', backdropFilter: 'blur(4px)' }}>
+      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}>
       <div className={`clay animate-bounce-in w-full max-w-sm p-8 flex flex-col items-center gap-5 text-center`}>
         {/* Progress dots */}
         <div className="flex gap-2">

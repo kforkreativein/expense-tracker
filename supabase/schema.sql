@@ -66,13 +66,15 @@ create table if not exists public.categories (
 alter table public.categories enable row level security;
 create policy "categories_all_own" on public.categories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Category transfers
+-- Wallet transfers (the table name is retained for existing installations)
 create table if not exists public.category_transfers (
   id text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
   amount integer not null,
-  from_category_id text not null,
-  to_category_id text not null,
+  from_category_id text,
+  to_category_id text,
+  from_wallet_id text not null,
+  to_wallet_id text not null,
   note text,
   date date not null,
   created_at bigint not null,

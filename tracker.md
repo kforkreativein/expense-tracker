@@ -90,13 +90,14 @@
 | 47 | Savings goal | ✅ Completed | Target tracked via total investments, editable goal card |
 | 48 | Due reminders | ✅ Completed | Upcoming recurring rules due within 7 days |
 | 49 | Weekly summary | ✅ Completed | This week income, expense, investment, net |
-| 50 | Category transfer | ✅ Completed | Move funds between categories without wallet change |
+| 50 | Wallet transfer | ✅ Completed | Move money directly between bank accounts, cash, and custom wallets; legacy category transfers migrate to wallets |
 | 51 | Year-end report | ✅ Completed | Download CSV report with category & monthly breakdown |
 | 52 | Low balance alert | ✅ Completed | Per-wallet min balance alert when editing wallet |
 | 53 | Supabase cloud sync | ✅ Completed | Optional; username login syncs across devices when env vars set. See SUPABASE_SETUP.md |
-| 54 | Category ↔ wallet linking | ✅ Completed | Link category to bank wallet in Settings; transfers auto-move between wallets |
+| 54 | Category ↔ wallet linking | ✅ Completed | Optional category reference for budgeting and transaction tags; transfers use wallets directly |
 | 55 | Can I afford this? check | ✅ Completed | Quick budget + wallet balance check before spending |
-| 56 | Transfer history + undo | ✅ Completed | List transfers; undo reverses category + wallet entries |
+| 56 | Transfer history + undo | ✅ Completed | List wallet transfers; undo reverses both wallet entries |
+| 67 | Dark app icon | ✅ Completed | Charcoal app icon with a simple wallet and rupee symbol for browser and home screen |
 | 57 | Monthly close summary | ✅ Completed | Last month income/expense/by-category recap card |
 | 58 | Personal / Business view mode | ✅ Completed | View toggle filters stats, list, charts |
 | 59 | Business profit snapshot | ✅ Completed | Business income − expense this month |
@@ -112,4 +113,4 @@
 | 27 | Expense sad descending tones | ⬜ Removed | Audio effects removed |
 | 28 | Emoji rain for big expenses | ⬜ Removed | Negative celebration removed |
 | 29 | Motivation banner toast | ⬜ Removed | Negative celebration removed |
-| 43 | Dark mode | ⬜ Not Started | Not planned (warm cream is intentional) |
+| 43 | Dark mode | ✅ Completed | Light default with a saved manual switch; all app surfaces use a charcoal clay theme in dark mode |

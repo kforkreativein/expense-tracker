@@ -5,7 +5,7 @@ import "./globals.css";
 const nunito = Nunito({ subsets: ["latin"], weight: ["400", "600", "700", "800", "900"] });
 
 export const metadata: Metadata = {
-  title: "Money Buddy 💰",
+  title: "Money Buddy",
   description: "Your simple & joyful expense tracker",
   manifest: "/manifest.json",
   icons: {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#a78bfa",
+  themeColor: "#FFF7ED",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

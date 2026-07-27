@@ -384,7 +384,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId }: Pr
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'rgba(28,25,23,0.55)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}>
       <div
         className="clay animate-slide-up w-full max-w-sm max-h-[90dvh] overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px]"

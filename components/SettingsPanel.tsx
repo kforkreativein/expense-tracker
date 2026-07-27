@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Category, Wallet } from '@/lib/types';
+import { Category } from '@/lib/types';
 import { getCategories, addCategory, updateCategory, deleteCategory } from '@/lib/categories';
-import { getWallets } from '@/lib/wallets';
 import { clearCategoryFromTransactions } from '@/lib/storage';
-import { clearTransfersForCategory } from '@/lib/transfers';
 import EmojiPicker from './EmojiPicker';
 import {
   canUseNotifications,
@@ -13,6 +11,7 @@ import {
   setNotificationsEnabled,
 } from '@/lib/notifications';
 import { getCreditCardsEnabled, setCreditCardsEnabled, getSplitEnabled, setSplitEnabled } from '@/lib/settings';
+import { getTheme, setTheme, Theme } from '@/lib/theme';
 
 function fmt(n: number) {
   return `₹${n.toLocaleString('en-IN')}`;
@@ -25,7 +24,6 @@ interface Props {
 
 export default function SettingsPanel({ onClose, onChange }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
   const [newName, setNewName] = useState('');
   const [newEmoji, setNewEmoji] = useState('🏷️');
   const [budgetDrafts, setBudgetDrafts] = useState<Record<string, string>>({});
@@ -33,11 +31,11 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
   const [notifMsg, setNotifMsg] = useState('');
   const [ccOn, setCcOn] = useState(false);
   const [splitOn, setSplitOn] = useState(false);
+  const [theme, setThemeState] = useState<Theme>('light');
 
   function reload() {
     const cats = getCategories();
     setCategories(cats);
-    setWallets(getWallets());
     setBudgetDrafts(Object.fromEntries(
       cats.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
     ));
@@ -48,6 +46,7 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
     setNotifOn(notificationsEnabled());
     setCcOn(getCreditCardsEnabled());
     setSplitOn(getSplitEnabled());
+    setThemeState(getTheme());
   }, []);
 
   async function toggleNotifications() {
@@ -79,7 +78,6 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
   function handleDelete(id: string) {
     deleteCategory(id);
     clearCategoryFromTransactions(id);
-    clearTransfersForCategory(id);
     reload();
     onChange();
   }
@@ -91,21 +89,10 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
     onChange();
   }
 
-  function saveWallet(categoryId: string, walletId: string) {
-    updateCategory(categoryId, { walletId: walletId || undefined });
-    reload();
-    onChange();
-  }
-
-  function walletLabel(walletId: string) {
-    const w = wallets.find(x => x.id === walletId);
-    return w ? `${w.emoji} ${w.name}` : walletId;
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'rgba(28,25,23,0.55)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}>
       <div
         className="clay animate-slide-up w-full max-w-sm max-h-[90dvh] overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px]"
@@ -117,6 +104,25 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
+          <div className="clay p-3 flex flex-col gap-2">
+            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Appearance</p>
+            <p className="text-xs font-semibold text-stone-500 leading-relaxed">
+              Choose the look that feels best for you. Your choice stays saved on this device.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(['light', 'dark'] as Theme[]).map(option => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => { setTheme(option); setThemeState(option); }}
+                  className={`clay-btn py-3 rounded-[14px] font-black text-sm min-h-[44px] ${
+                    theme === option ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
+                  }`}>
+                  {option === 'light' ? '☀️ Light' : '🌙 Dark'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="clay p-3 flex flex-col gap-2">
             <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Notifications</p>
             <p className="text-xs font-semibold text-stone-500 leading-relaxed">
@@ -169,7 +175,7 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
           <div className="clay p-3 flex flex-col gap-1">
             <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Categories</p>
             <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-              Tag income &amp; expenses (e.g. Personal, Business). Link each category to a bank wallet — transfers between categories will move money automatically (e.g. Yes Bank → HDFC).
+              Tag income and expenses (for example, Personal or Business). Wallet transfers are handled separately from categories.
             </p>
           </div>
 
@@ -190,26 +196,6 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
                       className="clay-btn text-rose-400 text-xs px-2 py-1 rounded-[8px]">
                       Delete
                     </button>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-stone-400">Linked wallet</span>
-                    <select
-                      value={cat.walletId ?? ''}
-                      onChange={e => saveWallet(cat.id, e.target.value)}
-                      className="clay w-full px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none">
-                      <option value="">None — category only</option>
-                      {wallets.map(w => (
-                        <option key={w.id} value={w.id}>
-                          {w.emoji} {w.name}
-                        </option>
-                      ))}
-                    </select>
-                    {cat.walletId && (
-                      <p className="text-[10px] font-semibold text-violet-600">
-                        Transfers use {walletLabel(cat.walletId)}
-                      </p>
-                    )}
                   </div>
 
                   <div className="flex gap-2 items-center">
