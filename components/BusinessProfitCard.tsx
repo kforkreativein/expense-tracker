@@ -33,7 +33,7 @@ export default function BusinessProfitCard({ categories, transactions, transfers
       <p className={`text-2xl font-black ${profit >= 0 ? 'text-amber-900' : 'text-rose-600'}`}>
         {showAmount ? `${profit >= 0 ? '+' : ''}${fmt(profit)}` : '₹ ·····'}
       </p>
-      <p className="text-xs font-semibold text-amber-800/80">
+      <p className="business-profit-caption text-xs font-semibold">
         This month: income {showAmount ? fmt(totals.income) : '···'} − expense {showAmount ? fmt(totals.expense) : '···'} (investments excluded)
       </p>
     </div>

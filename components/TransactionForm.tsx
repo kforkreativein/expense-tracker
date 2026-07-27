@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Transaction, TxType, Frequency, Wallet, Category } from '@/lib/types';
 import { getWallets, addWallet, legacyWalletId, walletToPaymentMode } from '@/lib/wallets';
-import { getCategories } from '@/lib/categories';
+import { getCategories, suggestedWalletForCategory } from '@/lib/categories';
 import { findRuleForTransaction, syncRuleForTransaction } from '@/lib/recurring';
 import EmojiPicker from './EmojiPicker';
 
@@ -226,7 +226,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
               <button key={c.id} type="button" onClick={() => {
                 setCategoryId(c.id);
                 // A category can suggest its own wallet; the user can still change it below.
-                setWalletId(c.walletId ?? wallets[0]?.id ?? '');
+                setWalletId(suggestedWalletForCategory(c, wallets) ?? wallets[0]?.id ?? '');
               }}
                 className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
                   categoryId === c.id ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'

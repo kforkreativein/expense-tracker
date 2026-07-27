@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Category } from '@/lib/types';
-import { getCategories, addCategory, updateCategory, deleteCategory } from '@/lib/categories';
+import { getCategories, addCategory, updateCategory, deleteCategory, suggestedWalletForCategory } from '@/lib/categories';
 import { clearCategoryFromTransactions } from '@/lib/storage';
 import EmojiPicker from './EmojiPicker';
 import {
@@ -223,7 +223,7 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
                   <div className="flex gap-2 items-center">
                     <span className="text-xs font-bold text-stone-400 whitespace-nowrap">Default wallet</span>
                     <select
-                      value={cat.walletId ?? ''}
+                      value={cat.walletId ?? suggestedWalletForCategory(cat, wallets) ?? ''}
                       onChange={e => { updateCategory(cat.id, { walletId: e.target.value || undefined }); reload(); onChange(); }}
                       className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none min-h-[44px]"
                       aria-label={`Default wallet for ${cat.name}`}>

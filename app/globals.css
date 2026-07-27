@@ -162,6 +162,12 @@ html[data-theme='dark'] .budget-meter__track { background: #4f2029; border-color
 html[data-theme='dark'] .budget-meter__fill { background: #ff6b7c; box-shadow: 0 0 10px rgba(255, 107, 124, 0.60); }
 html[data-theme='dark'] .budget-meter__fill.is-over { background: #ff3f5f; box-shadow: 0 0 14px rgba(255, 63, 95, 0.90); }
 
+.business-profit-caption { color: #9f1239; }
+html[data-theme='dark'] .business-profit-caption {
+  color: #ffd1d7;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+}
+
 /* Transaction rows use the same restrained surface language as the rest of dark mode. */
 .transaction-card {
   border: 1px solid rgba(120,113,108,0.20);
