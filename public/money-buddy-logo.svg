@@ -1,14 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Money Buddy app icon</title>
-  <desc id="desc">A simple charcoal wallet with ivory cash and an emerald growth arrow.</desc>
+  <desc id="desc">A dark wallet with ivory cash and an emerald growth arrow.</desc>
   <defs>
-    <linearGradient id="tile" x1="76" y1="58" x2="440" y2="456" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#303030"/>
-      <stop offset="1" stop-color="#161616"/>
-    </linearGradient>
-    <linearGradient id="wallet" x1="108" y1="206" x2="404" y2="406" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3D3D3D"/>
-      <stop offset="1" stop-color="#242424"/>
+    <radialGradient id="tile" cx="50%" cy="18%" r="96%">
+      <stop stop-color="#242424"/>
+      <stop offset=".58" stop-color="#111111"/>
+      <stop offset="1" stop-color="#080808"/>
+    </radialGradient>
+    <linearGradient id="wallet" x1="118" y1="210" x2="398" y2="394" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#424242"/>
+      <stop offset="1" stop-color="#282828"/>
     </linearGradient>
     <linearGradient id="cash" x1="170" y1="122" x2="298" y2="244" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFFDF7"/>
@@ -20,14 +21,14 @@
     </filter>
   </defs>
   <rect width="512" height="512" rx="118" fill="url(#tile)"/>
+  <rect x="82" y="82" width="348" height="348" rx="88" fill="none" stroke="#4B4B4B" stroke-opacity=".52" stroke-width="3"/>
   <g filter="url(#depth)">
-    <rect x="156" y="128" width="86" height="132" rx="18" fill="url(#cash)" transform="rotate(9 156 128)"/>
-    <rect x="202" y="114" width="86" height="146" rx="18" fill="url(#cash)" transform="rotate(3 202 114)"/>
-    <rect x="248" y="130" width="86" height="130" rx="18" fill="url(#cash)" transform="rotate(-7 248 130)"/>
-    <rect x="90" y="210" width="332" height="192" rx="52" fill="url(#wallet)" stroke="#5A5A5A" stroke-width="9"/>
-    <path d="M90 276h250c39 0 70 31 70 70v6c0 28-23 50-50 50H90" fill="#343434" stroke="#646464" stroke-width="9"/>
-    <path d="M187 338l51-47 31 28 62-65" fill="none" stroke="#4ED182" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M303 254h28v28" fill="none" stroke="#4ED182" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="356" cy="346" r="12" fill="#4ED182"/>
+    <path d="M176 246V139c0-18 15-33 33-33h94c18 0 33 15 33 33v107" fill="url(#cash)" stroke="#F9F3E8" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M207 140h96M207 172h96" stroke="#C6C0B4" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+    <rect x="108" y="216" width="296" height="174" rx="48" fill="url(#wallet)" stroke="#5A5A5A" stroke-width="9"/>
+    <path d="M122 278h224c32 0 58 26 58 58v8c0 25-20 46-46 46H122c-8 0-14-6-14-14V292c0-8 6-14 14-14Z" fill="#353535" stroke="#666666" stroke-width="9"/>
+    <path d="M183 335l50-52 37 34 62-70" fill="none" stroke="#4ED182" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M302 247h30v30" fill="none" stroke="#4ED182" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="348" cy="332" r="14" fill="#4ED182"/>
   </g>
 </svg>
