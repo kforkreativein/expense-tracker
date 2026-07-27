@@ -12,6 +12,7 @@ import {
 } from '@/lib/notifications';
 import { getCreditCardsEnabled, setCreditCardsEnabled, getSplitEnabled, setSplitEnabled } from '@/lib/settings';
 import { getTheme, setTheme, Theme } from '@/lib/theme';
+import { getWallets } from '@/lib/wallets';
 
 function fmt(n: number) {
   return `₹${n.toLocaleString('en-IN')}`;
@@ -32,10 +33,12 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
   const [ccOn, setCcOn] = useState(false);
   const [splitOn, setSplitOn] = useState(false);
   const [theme, setThemeState] = useState<Theme>('light');
+  const [wallets, setWallets] = useState<import('@/lib/types').Wallet[]>([]);
 
   function reload() {
     const cats = getCategories();
     setCategories(cats);
+    setWallets(getWallets());
     setBudgetDrafts(Object.fromEntries(
       cats.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
     ));
@@ -216,6 +219,17 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
                       className="clay-btn bg-violet-500 text-white font-black text-xs px-2.5 py-2 rounded-[8px]">
                       Save
                     </button>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <span className="text-xs font-bold text-stone-400 whitespace-nowrap">Default wallet</span>
+                    <select
+                      value={cat.walletId ?? ''}
+                      onChange={e => { updateCategory(cat.id, { walletId: e.target.value || undefined }); reload(); onChange(); }}
+                      className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none min-h-[44px]"
+                      aria-label={`Default wallet for ${cat.name}`}>
+                      <option value="">First wallet</option>
+                      {wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.emoji} {wallet.name}</option>)}
+                    </select>
                   </div>
                   {cat.budget > 0 && (
                     <p className="text-[10px] font-bold text-violet-600">Budget set: {fmt(cat.budget)}/month</p>

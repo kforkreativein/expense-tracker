@@ -138,6 +138,30 @@ html[data-theme='dark'] .bg-red-600 { background-color: #dc4055; }
 html[data-theme='dark'] ::placeholder { color: #aaa6a2; }
 html[data-theme='dark'] input[type="date"] { color-scheme: dark; }
 
+/* Budget warnings stay legible against every charcoal surface. */
+.budget-meter__track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fecdd3;
+  border: 1px solid rgba(190, 24, 93, 0.18);
+}
+.budget-meter__fill {
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: #e11d48;
+  box-shadow: 0 0 8px rgba(225, 29, 72, 0.45);
+  transition: width 500ms ease;
+}
+.budget-meter__fill.is-over {
+  background: #ff3f5f;
+  box-shadow: 0 0 12px rgba(255, 63, 95, 0.75);
+}
+html[data-theme='dark'] .budget-meter__track { background: #4f2029; border-color: rgba(255, 142, 156, 0.32); }
+html[data-theme='dark'] .budget-meter__fill { background: #ff6b7c; box-shadow: 0 0 10px rgba(255, 107, 124, 0.60); }
+html[data-theme='dark'] .budget-meter__fill.is-over { background: #ff3f5f; box-shadow: 0 0 14px rgba(255, 63, 95, 0.90); }
+
 /* Transaction rows use the same restrained surface language as the rest of dark mode. */
 .transaction-card {
   border: 1px solid rgba(120,113,108,0.20);

@@ -123,8 +123,8 @@ export default function StatsBar({ transactions, budget, categories, categoryFil
       {/* Total expense budget bar */}
       {!categoryFilter && budget > 0 && (
         <div className="px-1">
-          <div className="h-1.5 rounded-full bg-red-200/60 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${overBudget ? 'bg-red-600' : 'bg-red-400'}`} style={{ width: `${budgetPct * 100}%` }} />
+          <div className="budget-meter__track" role="progressbar" aria-valuenow={Math.round(budgetPct * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <div className={`budget-meter__fill ${overBudget ? 'is-over' : ''}`} style={{ width: `${budgetPct * 100}%` }} />
           </div>
           <p className="text-[10px] font-bold text-red-800/70 mt-0.5">
             {overBudget ? `Over total budget by ${fmt(expense - budget)}` : `${fmt(budget - expense)} left of ${fmt(budget)} total expense budget`}

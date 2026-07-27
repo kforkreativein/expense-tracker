@@ -223,7 +223,11 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
                 !categoryId ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
               }`}>None</button>
             {categories.map(c => (
-              <button key={c.id} type="button" onClick={() => setCategoryId(c.id)}
+              <button key={c.id} type="button" onClick={() => {
+                setCategoryId(c.id);
+                // A category can suggest its own wallet; the user can still change it below.
+                setWalletId(c.walletId ?? wallets[0]?.id ?? '');
+              }}
                 className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
                   categoryId === c.id ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
                 }`}>
