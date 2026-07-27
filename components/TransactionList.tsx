@@ -203,14 +203,14 @@ export default function TransactionList({
                     : txn.description;
 
                   const cardClass = isSplit
-                    ? 'bg-gradient-to-r from-teal-50 to-white shadow-[5px_5px_10px_rgba(20,184,166,0.12),-3px_-3px_8px_rgba(255,255,255,0.85)]'
+                    ? 'transaction-card--split'
                     : isTransfer
-                    ? 'bg-gradient-to-r from-violet-50 to-white shadow-[5px_5px_10px_rgba(167,139,250,0.12),-3px_-3px_8px_rgba(255,255,255,0.85)]'
+                    ? 'transaction-card--transfer'
                     : txn.type === 'income'
-                    ? 'bg-gradient-to-r from-emerald-50 to-white shadow-[5px_5px_10px_rgba(52,211,153,0.12),-3px_-3px_8px_rgba(255,255,255,0.85)]'
+                    ? 'transaction-card--income'
                     : txn.type === 'investment'
-                      ? 'bg-gradient-to-r from-blue-50 to-white shadow-[5px_5px_10px_rgba(96,165,250,0.12),-3px_-3px_8px_rgba(255,255,255,0.85)]'
-                      : 'bg-gradient-to-r from-rose-50 to-white shadow-[5px_5px_10px_rgba(248,113,113,0.12),-3px_-3px_8px_rgba(255,255,255,0.85)]';
+                      ? 'transaction-card--investment'
+                      : 'transaction-card--expense';
                   const iconClass = isSplit ? 'clay-amber' : isTransfer ? 'clay-purple' : txn.type === 'income' ? 'clay-green' : txn.type === 'investment' ? 'clay-blue' : 'clay-red';
                   const icon = isSplit ? '✂️' : isTransfer ? '🔁' : txn.type === 'income' ? '💰' : txn.type === 'investment' ? '📈' : '💸';
                   const amountClass = isSplit ? 'text-teal-700' : isTransfer ? 'text-violet-700' : txn.type === 'income' ? 'text-emerald-600' : txn.type === 'investment' ? 'text-blue-600' : 'text-rose-500';
@@ -218,7 +218,7 @@ export default function TransactionList({
 
                   return (
                   <div key={txn.id}
-                    className={`animate-pop-in flex items-center gap-3 p-4 rounded-[20px] border-2 ${isSplit ? 'border-teal-100' : 'border-white/60'} ${cardClass}`}>
+                    className={`animate-pop-in transaction-card ${cardClass} flex items-center gap-3 p-4 rounded-[20px]`}>
 
                     <div className={`text-2xl w-11 h-11 flex items-center justify-center rounded-[12px] flex-shrink-0 ${iconClass}`}
                       aria-hidden="true">
