@@ -41,8 +41,9 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
 
   useEffect(() => {
     const ws = getWallets();
+    const cs = getCategories();
     setWallets(ws);
-    setCategories(getCategories());
+    setCategories(cs);
     if (initial) {
       setType(initial.type);
       setAmount(String(initial.amount));
@@ -60,7 +61,8 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
       setDescription('');
       setDate(today());
       setWalletId(ws[0]?.id ?? '');
-      setCategoryId('');
+      // Everyday entries should never start uncategorised by accident.
+      setCategoryId(cs.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? '');
       setRecurring(false);
       setFrequency('monthly');
     }
@@ -129,7 +131,12 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
           { t: 'investment' as TxType, label: '📈 Invest', active: 'clay-blue text-blue-900' },
         ]).map(({ t, label, active }) => (
           <button key={t} type="button"
-            onClick={() => setType(t)}
+            onClick={() => {
+              setType(t);
+              if (t !== 'investment' && !categoryId) {
+                setCategoryId(categories.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? '');
+              }
+            }}
             className={`clay-btn py-3 rounded-[14px] font-black text-sm transition-all ${
               type === t ? active : 'bg-stone-100 text-stone-400 shadow-none border border-stone-200'
             }`}>

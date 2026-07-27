@@ -125,35 +125,40 @@ html[data-theme='dark'] .text-rose-900, html[data-theme='dark'] .text-rose-800 {
 html[data-theme='dark'] .text-rose-700, html[data-theme='dark'] .text-rose-600, html[data-theme='dark'] .text-rose-500 { color: #ffb4ba; }
 html[data-theme='dark'] .text-red-900, html[data-theme='dark'] .text-red-800 { color: #ffd5d7; }
 html[data-theme='dark'] .text-red-700, html[data-theme='dark'] .text-red-600, html[data-theme='dark'] .text-red-500 { color: #ffb4ba; }
+html[data-theme='dark'] .text-red-800\/70 { color: #ffadb7; opacity: 1; }
 html[data-theme='dark'] .text-blue-900, html[data-theme='dark'] .text-blue-800 { color: #d3ebff; }
 html[data-theme='dark'] .text-blue-700, html[data-theme='dark'] .text-blue-600 { color: #a9d8ff; }
 html[data-theme='dark'] .text-amber-900, html[data-theme='dark'] .text-amber-800 { color: #ffe5ae; }
 html[data-theme='dark'] .text-amber-700, html[data-theme='dark'] .text-amber-600 { color: #f9cf7b; }
+html[data-theme='dark'] .text-amber-800\/70 { color: #ffd58d; opacity: 1; }
 html[data-theme='dark'] .text-teal-700, html[data-theme='dark'] .text-teal-600 { color: #8de2d0; }
-html[data-theme='dark'] .bg-red-400 { background-color: #c85c66; }
-html[data-theme='dark'] .bg-red-600 { background-color: #aa4652; }
+html[data-theme='dark'] .bg-red-200\/60 { background-color: #54262e; }
+html[data-theme='dark'] .bg-red-400 { background-color: #f06474; }
+html[data-theme='dark'] .bg-red-600 { background-color: #dc4055; }
 html[data-theme='dark'] ::placeholder { color: #aaa6a2; }
 html[data-theme='dark'] input[type="date"] { color-scheme: dark; }
 
 /* Transaction rows use the same restrained surface language as the rest of dark mode. */
 .transaction-card {
-  border: 2px solid rgba(255,255,255,0.60);
-  box-shadow: 5px 5px 10px rgba(0,0,0,0.10), -3px -3px 8px rgba(255,255,255,0.85);
+  border: 1px solid rgba(120,113,108,0.20);
+  border-left-width: 4px;
+  box-shadow: 3px 4px 9px rgba(0,0,0,0.08), -2px -2px 6px rgba(255,255,255,0.70);
 }
-.transaction-card--split { background: linear-gradient(90deg, #f0fdfa, #ffffff); }
-.transaction-card--transfer { background: linear-gradient(90deg, #f5f3ff, #ffffff); }
-.transaction-card--income { background: linear-gradient(90deg, #ecfdf5, #ffffff); }
-.transaction-card--investment { background: linear-gradient(90deg, #eff6ff, #ffffff); }
-.transaction-card--expense { background: linear-gradient(90deg, #fff1f2, #ffffff); }
+.transaction-card--split { background: #ffffff; border-left-color: #2dd4bf; }
+.transaction-card--transfer { background: #ffffff; border-left-color: #8b5cf6; }
+.transaction-card--income { background: #ffffff; border-left-color: #34d399; }
+.transaction-card--investment { background: #ffffff; border-left-color: #60a5fa; }
+.transaction-card--expense { background: #ffffff; border-left-color: #fb7185; }
 html[data-theme='dark'] .transaction-card {
-  border-color: rgba(255,255,255,0.12);
-  box-shadow: 0 8px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035);
+  background: linear-gradient(145deg, #292929, #232323);
+  border-color: #3b3b3b;
+  box-shadow: 0 5px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.035);
 }
-html[data-theme='dark'] .transaction-card--split { background: linear-gradient(90deg, #1b3736, #212121); }
-html[data-theme='dark'] .transaction-card--transfer { background: linear-gradient(90deg, #30264a, #212121); }
-html[data-theme='dark'] .transaction-card--income { background: linear-gradient(90deg, #193f34, #212121); }
-html[data-theme='dark'] .transaction-card--investment { background: linear-gradient(90deg, #203d58, #212121); }
-html[data-theme='dark'] .transaction-card--expense { background: linear-gradient(90deg, #48272c, #212121); }
+html[data-theme='dark'] .transaction-card--split { border-left-color: #57cdbd; }
+html[data-theme='dark'] .transaction-card--transfer { border-left-color: #ad93ff; }
+html[data-theme='dark'] .transaction-card--income { border-left-color: #64d7a5; }
+html[data-theme='dark'] .transaction-card--investment { border-left-color: #7ebdf7; }
+html[data-theme='dark'] .transaction-card--expense { border-left-color: #ff8d9c; }
 
 /* ── Animations ── */
 @keyframes fall {

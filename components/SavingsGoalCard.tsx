@@ -43,7 +43,7 @@ export default function SavingsGoalCard({ transactions, onChange }: {
   }
 
   return (
-    <div className="clay clay-purple p-4 flex flex-col gap-3">
+    <div className="clay clay-purple p-4 flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-black text-violet-900 uppercase tracking-wider">🎯 Savings Goal</h3>
         <button type="button" onClick={() => setEditing(v => !v)} className="clay-btn text-xs font-bold text-violet-700 px-2 py-1 rounded-[8px]">
@@ -75,13 +75,16 @@ export default function SavingsGoalCard({ transactions, onChange }: {
         </div>
       ) : goal ? (
         <>
-          <p className="text-sm font-black text-violet-900">{goal.label}</p>
-          <div className="h-3 rounded-full bg-violet-200/70 overflow-hidden">
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-sm font-black text-violet-900 truncate">{goal.label}</p>
+            <p className="text-xs font-bold text-violet-800 whitespace-nowrap">
+              {fmt(saved)} / {fmt(target)}
+            </p>
+          </div>
+          <div className="h-2.5 rounded-full bg-violet-200/70 overflow-hidden">
             <div className="h-full rounded-full bg-violet-500 transition-all duration-500" style={{ width: `${pct * 100}%` }} />
           </div>
-          <p className="text-xs font-bold text-violet-800">
-            {fmt(saved)} of {fmt(target)} ({Math.round(pct * 100)}%)
-          </p>
+          <p className="text-[11px] font-bold text-violet-800">{Math.round(pct * 100)}% complete</p>
         </>
       ) : (
         <p className="text-sm font-semibold text-violet-700/80">Set a savings target — we&apos;ll track it from your investments.</p>

@@ -218,7 +218,7 @@ export default function TransactionList({
 
                   return (
                   <div key={txn.id}
-                    className={`animate-pop-in transaction-card ${cardClass} flex items-center gap-3 p-4 rounded-[20px]`}>
+                    className={`animate-pop-in transaction-card ${cardClass} flex items-center gap-3 p-3.5 rounded-[18px]`}>
 
                     <div className={`text-2xl w-11 h-11 flex items-center justify-center rounded-[12px] flex-shrink-0 ${iconClass}`}
                       aria-hidden="true">
