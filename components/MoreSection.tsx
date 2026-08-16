@@ -30,6 +30,7 @@ interface Props {
   recurringRefresh: number;
   onTransfer: () => void;
   onTransferUndo: () => void;
+  pane?: 'insights' | 'tools' | 'all';
 }
 
 export default function MoreSection(props: Props) {
@@ -37,8 +38,51 @@ export default function MoreSection(props: Props) {
   const {
     transactions, viewTransactions, transfers, categories, viewMode,
     walletFilter, onWalletFilter, budget, onSetBudget, onRefresh, recurringRefresh,
-    onTransfer, onTransferUndo,
+    onTransfer, onTransferUndo, pane = 'all',
   } = props;
+
+  const insights = (
+    <>
+      <InsightsChart transactions={viewTransactions} />
+      <WeeklySummary transactions={viewTransactions} />
+      {viewMode === 'all' && (
+        <CategoryBreakdown transactions={transactions} transfers={transfers} categories={categories} />
+      )}
+      <AffordCheckCard categories={categories} transactions={transactions} transfers={transfers} />
+      <YearEndReport transactions={transactions} transfers={transfers} categories={categories} />
+    </>
+  );
+
+  const tools = (
+    <>
+      <WalletBar transactions={transactions} selectedWallet={walletFilter} onSelectWallet={onWalletFilter} onChange={onRefresh} />
+      <BottomTools
+        transactions={viewTransactions}
+        budget={budget}
+        onSetBudget={onSetBudget}
+        onRefresh={onRefresh}
+        recurringRefresh={recurringRefresh}
+      />
+      <SavingsGoalCard transactions={transactions} />
+      <DueReminders />
+      <BusinessProfitCard categories={categories} transactions={transactions} transfers={transfers} />
+      <MonthlyCloseCard transactions={transactions} transfers={transfers} categories={categories} />
+      <CategoryTransferPanel onTransfer={onTransfer} />
+      <TransferHistory onUndo={onTransferUndo} />
+    </>
+  );
+
+  if (pane === 'insights') {
+    return <div className="flex flex-col gap-4">{insights}</div>;
+  }
+  if (pane === 'tools') {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="px-1 text-[28px] font-black text-white">Financial Tools</h1>
+        {tools}
+      </div>
+    );
+  }
 
   return (
     <div className="clay flex flex-col mt-2">
@@ -51,27 +95,8 @@ export default function MoreSection(props: Props) {
       </button>
       {open && (
         <div className="px-1 pb-3 flex flex-col gap-4">
-          <BusinessProfitCard categories={categories} transactions={transactions} transfers={transfers} />
-          <AffordCheckCard categories={categories} transactions={transactions} transfers={transfers} />
-          <MonthlyCloseCard transactions={transactions} transfers={transfers} categories={categories} />
-          <WalletBar transactions={transactions} selectedWallet={walletFilter} onSelectWallet={onWalletFilter} onChange={onRefresh} />
-          <BottomTools
-            transactions={viewTransactions}
-            budget={budget}
-            onSetBudget={onSetBudget}
-            onRefresh={onRefresh}
-            recurringRefresh={recurringRefresh}
-          />
-          <InsightsChart transactions={viewTransactions} />
-          <SavingsGoalCard transactions={transactions} />
-          <DueReminders />
-          <WeeklySummary transactions={viewTransactions} />
-          {viewMode === 'all' && (
-            <CategoryBreakdown transactions={transactions} transfers={transfers} categories={categories} />
-          )}
-          <CategoryTransferPanel onTransfer={onTransfer} />
-          <TransferHistory onUndo={onTransferUndo} />
-          <YearEndReport transactions={transactions} transfers={transfers} categories={categories} />
+          {tools}
+          {insights}
         </div>
       )}
     </div>

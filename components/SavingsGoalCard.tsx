@@ -59,7 +59,7 @@ export default function SavingsGoalCard({ transactions, onChange }: {
             placeholder="Goal name"
             className="clay px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none w-full"
           />
-          <div className="flex gap-2 items-center">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 items-center min-w-0">
             <span className="font-black text-stone-500">₹</span>
             <input
               type="text"
@@ -67,9 +67,9 @@ export default function SavingsGoalCard({ transactions, onChange }: {
               value={targetDraft}
               onChange={e => setTargetDraft(e.target.value.replace(/[^\d.]/g, ''))}
               placeholder="Target amount"
-              className="clay flex-1 px-3 py-2.5 bg-transparent outline-none font-bold text-stone-700"
+              className="clay w-full min-w-0 px-3 py-2.5 bg-transparent outline-none font-bold text-stone-700"
             />
-            <button type="button" onClick={save} className="clay-btn bg-violet-500 text-white font-black text-xs px-3 py-1.5 rounded-[8px]">Save</button>
+            <button type="button" onClick={save} className="clay-btn bg-violet-500 text-white font-black text-xs px-3 py-1.5 rounded-[8px] shrink-0">Save</button>
           </div>
           <p className="text-[10px] text-violet-700/80 font-semibold">Progress counts your total investments 📈</p>
         </div>

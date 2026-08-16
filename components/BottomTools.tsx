@@ -69,7 +69,7 @@ export default function BottomTools({ transactions, budget, onSetBudget, onRefre
       </div>
 
       {showBudget && (
-        <div className="clay animate-pop-in flex gap-2 p-3 items-center">
+        <div className="clay animate-pop-in grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 p-3 items-center min-w-0">
           <span className="text-stone-500 font-black text-sm">₹</span>
           <input
             type="text"
@@ -79,10 +79,10 @@ export default function BottomTools({ transactions, budget, onSetBudget, onRefre
             onChange={e => setBudgetDraft(e.target.value.replace(/[^\d.]/g, ''))}
             onKeyDown={e => e.key === 'Enter' && saveBudget()}
             placeholder="Monthly limit (0 to clear)"
-            className="clay flex-1 px-3 py-2.5 bg-transparent outline-none font-bold text-stone-700 placeholder:text-stone-400"
+            className="clay w-full min-w-0 px-3 py-2.5 bg-transparent outline-none font-bold text-stone-700 placeholder:text-stone-400"
           />
           <button onClick={saveBudget}
-            className="clay-btn bg-violet-500 text-white font-black text-xs px-3 py-1.5 rounded-[10px]">
+            className="clay-btn bg-violet-500 text-white font-black text-xs px-3 py-1.5 rounded-[10px] shrink-0">
             Save
           </button>
         </div>

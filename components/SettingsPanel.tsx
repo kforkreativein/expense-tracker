@@ -32,6 +32,7 @@ interface Props {
   onChange: () => void;
   /** Called after a full reset so the dashboard can reload from scratch. */
   onReset?: () => void;
+  embedded?: boolean;
 }
 
 type OpenSection = 'types' | 'spend' | null;
@@ -66,7 +67,7 @@ function Collapsible({
   );
 }
 
-export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
+export default function SettingsPanel({ onClose, onChange, onReset, embedded }: Props) {
   const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -88,10 +89,17 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
 
   function reload() {
     const cats = getCategories();
-    setCategories(cats);
-    setWallets(getWallets());
+    const nextWallets = getWallets();
+    setWallets(nextWallets);
+    cats.forEach(cat => {
+      if (cat.walletId && nextWallets.some(w => w.id === cat.walletId)) return;
+      const suggested = suggestedWalletForCategory(cat, nextWallets);
+      if (suggested) updateCategory(cat.id, { walletId: suggested });
+    });
+    const saved = getCategories();
+    setCategories(saved);
     setBudgetDrafts(Object.fromEntries(
-      cats.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
+      saved.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
     ));
     const spendCats = getSpendCategories();
     setSpendCategories(spendCats);
@@ -187,19 +195,21 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
     onChange();
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
-      <div
-        className="clay animate-slide-up w-full max-w-sm max-h-[90dvh] overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px]"
-        onClick={e => e.stopPropagation()}
-        onTouchStart={e => e.stopPropagation()}>
+  const body = (
+        <div className="flex flex-col gap-4 min-w-0">
+        {!embedded && (
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black text-stone-800">⚙️ Settings</h2>
           <button type="button" onClick={onClose} className="clay-btn w-10 h-10 rounded-[12px] text-stone-500 font-black">✕</button>
         </div>
+        )}
+        {embedded && (
+          <div className="px-1 pb-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">Your account</p>
+            <h2 className="text-[28px] font-black text-white">Settings</h2>
+            <p className="text-sm text-zinc-500">Make Money Buddy yours.</p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="clay p-3 flex flex-col gap-2">
@@ -287,23 +297,22 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
                 No types yet. Add one below!
               </p>
             ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 min-w-0">
               {categories.map(cat => (
-                <div key={cat.id} className="clay p-3 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{cat.emoji}</span>
-                    <span className="font-black text-stone-800 flex-1">{cat.name}</span>
+                <div key={cat.id} className="clay p-3 flex flex-col gap-3 overflow-hidden min-w-0 w-full">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xl shrink-0">{cat.emoji}</span>
+                    <span className="font-black text-stone-800 flex-1 min-w-0 truncate">{cat.name}</span>
                     <button
                       type="button"
                       onClick={() => handleDelete(cat.id)}
-                      className="clay-btn text-rose-400 text-xs px-2 py-1 rounded-[8px]">
+                      className="clay-btn text-rose-400 text-xs px-2 py-1 rounded-[8px] shrink-0">
                       Delete
                     </button>
                   </div>
 
-                  <div className="flex gap-2 items-center">
-                    <span className="text-xs font-bold text-stone-400">Budget</span>
-                    <span className="text-stone-400 font-black">₹</span>
+                  <div className="flex flex-col gap-2 min-w-0">
+                    <span className="text-xs font-bold text-stone-400">Budget ₹</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -311,21 +320,21 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
                       onChange={e => setBudgetDrafts(d => ({ ...d, [cat.id]: e.target.value.replace(/[^\d.]/g, '') }))}
                       onKeyDown={e => e.key === 'Enter' && saveBudget(cat.id)}
                       placeholder="Monthly limit"
-                      className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none placeholder:text-stone-400"
+                      className="clay w-full min-w-0 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none placeholder:text-stone-400"
                     />
                     <button
                       type="button"
                       onClick={() => saveBudget(cat.id)}
-                      className="clay-btn bg-violet-500 text-white font-black text-xs px-2.5 py-2 rounded-[8px]">
+                      className="clay-btn bg-violet-500 text-white font-black text-sm px-4 py-2.5 rounded-[10px] w-full">
                       Save
                     </button>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    <span className="text-xs font-bold text-stone-400 whitespace-nowrap">Default wallet</span>
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <span className="text-xs font-bold text-stone-400">Default wallet</span>
                     <select
                       value={cat.walletId ?? suggestedWalletForCategory(cat, wallets) ?? ''}
                       onChange={e => { updateCategory(cat.id, { walletId: e.target.value || undefined }); reload(); onChange(); }}
-                      className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none min-h-[44px]"
+                      className="clay w-full min-w-0 max-w-full px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none min-h-[44px]"
                       aria-label={`Default wallet for ${cat.name}`}>
                       <option value="">First wallet</option>
                       {wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.emoji} {wallet.name}</option>)}
@@ -470,10 +479,11 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
             </button>
           </div>
         </div>
-      </div>
+        </div>
+  );
 
-      {confirmReset && (
-        <div
+  const confirm = confirmReset ? (
+      <div
           className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
           style={{ background: 'var(--overlay-bg)' }}
           onClick={() => !resetting && setConfirmReset(false)}>
@@ -503,7 +513,27 @@ export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
             </div>
           </div>
         </div>
-      )}
+  ) : null;
+
+  if (embedded) return (
+    <>
+      {body}
+      {confirm}
+    </>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      <div
+        className="clay animate-slide-up w-full max-w-md max-h-[90dvh] overflow-x-hidden overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px] min-w-0"
+        onClick={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}>
+        {body}
+      </div>
+      {confirm}
     </div>
   );
 }

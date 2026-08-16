@@ -87,8 +87,8 @@ export default function ProfileHeader({ streak, onLogout, onOpenSettings }: Prop
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <span
             aria-hidden="true"
             style={{
@@ -98,9 +98,9 @@ export default function ProfileHeader({ streak, onLogout, onOpenSettings }: Prop
             }}
             className="h-[52px] w-[52px] shrink-0 rounded-[18px] shadow-[var(--surface-shadow)]"
           />
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">{getGreeting()}</p>
-            <h1 className="text-2xl font-black text-stone-800 leading-tight">
+            <h1 className="text-2xl font-black text-stone-800 leading-tight truncate">
               Hey {name ?? ''}!
             </h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">

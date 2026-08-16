@@ -17,11 +17,12 @@ import { isVoiceConfigured } from '@/lib/voice/client';
 import { isSupabaseEnabled } from '@/lib/supabase/client';
 import { isRecordingSupported } from '@/lib/voice/recorder';
 import { VoiceResult } from '@/lib/voice/types';
+import { isInMonth } from '@/lib/insights';
+import { sumRealExpense, sumRealIncome } from '@/lib/transfers';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
 import ProfileHeader from '@/components/ProfileHeader';
 import SettingsPanel from '@/components/SettingsPanel';
-import StatsBar from '@/components/StatsBar';
 import StreakPopup from '@/components/StreakPopup';
 import EntrySearch from '@/components/EntrySearch';
 import ViewModeBar from '@/components/ViewModeBar';
@@ -34,6 +35,9 @@ import MoreSection from '@/components/MoreSection';
 import SplitTab from '@/components/SplitTab';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirmSheet from '@/components/VoiceConfirmSheet';
+import BottomDock, { AppTab } from '@/components/BottomDock';
+import SiriHoldTop from '@/components/SiriHoldTop';
+import HomeDashboard from '@/components/HomeDashboard';
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -42,7 +46,6 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showStreakPopup, setShowStreakPopup] = useState(false);
   const [streak, setStreak] = useState(0);
   const [previousStreak, setPreviousStreak] = useState(0);
@@ -62,6 +65,10 @@ export default function Home() {
   // Mic support is a browser-only fact; the server snapshot must stay false
   const canRecord = useSyncExternalStore(() => () => {}, isRecordingSupported, () => false);
   const voiceEnabled = !!authenticated && isSupabaseEnabled() && canRecord;
+  const [tab, setTab] = useState<AppTab>('home');
+  const [monthCursor, setMonthCursor] = useState(() => new Date());
+  const [showBudget, setShowBudget] = useState(false);
+  const [budgetDraft, setBudgetDraft] = useState('');
 
   const refresh = useCallback(() => setTransactions(getTransactions()), []);
   const reloadSplits = useCallback(() => {
@@ -90,6 +97,29 @@ export default function Home() {
   );
 
   const categoryFilter = viewMode === 'all' ? null : viewMode;
+
+  const monthTransactions = useMemo(
+    () => statsTransactions.filter(t => isInMonth(t.date, monthCursor.getFullYear(), monthCursor.getMonth())),
+    [statsTransactions, monthCursor],
+  );
+  const monthTransfers = useMemo(
+    () => transfers.filter(t => isInMonth(t.date, monthCursor.getFullYear(), monthCursor.getMonth())),
+    [transfers, monthCursor],
+  );
+  const monthExpense = useMemo(() => sumRealExpense(monthTransactions, monthTransfers), [monthTransactions, monthTransfers]);
+  const monthIncome = useMemo(() => sumRealIncome(monthTransactions, monthTransfers), [monthTransactions, monthTransfers]);
+  const activeCategory = categoryFilter && categoryFilter !== '__none'
+    ? categories.find(c => c.id === categoryFilter)
+    : null;
+
+  function saveBudget() {
+    const val = Number(budgetDraft);
+    setBudget(val > 0 ? val : 0);
+    if (val > 0) localStorage.setItem(userStorageKey('money_buddy_budget'), String(val));
+    else localStorage.removeItem(userStorageKey('money_buddy_budget'));
+    scheduleCloudSync();
+    setShowBudget(false);
+  }
 
   const loadAppData = useCallback(() => {
     applyTheme(getTheme());
@@ -162,7 +192,6 @@ export default function Home() {
     setBudget(0);
     setShowOnboarding(false);
     setShowForm(false);
-    setShowSettings(false);
     setShowStreakPopup(false);
     setStreak(0);
     setWalletFilter(null);
@@ -223,20 +252,28 @@ export default function Home() {
     return <AuthScreen onAuth={handleAuth} />;
   }
 
+  const moreProps = {
+    transactions,
+    viewTransactions,
+    transfers,
+    categories,
+    viewMode,
+    walletFilter,
+    onWalletFilter: (id: string) => setWalletFilter(prev => prev === id ? null : id),
+    budget,
+    onSetBudget: setBudget,
+    onRefresh: refresh,
+    recurringRefresh,
+    onTransfer: () => { reloadTransfers(); reloadCategories(); refresh(); },
+    onTransferUndo: () => { reloadTransfers(); refresh(); },
+  };
+
   return (
     <main className="min-h-dvh overflow-x-hidden bg-[var(--app-bg)]">
       <div
-        className="max-w-md mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col gap-3"
-        style={{ paddingBottom: voiceEnabled
-          ? 'max(7.5rem, calc(env(safe-area-inset-bottom) + 6rem))'
-          : 'max(5rem, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
+        className="max-w-md w-full mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col gap-4 min-w-0 overflow-x-hidden"
+        style={{ paddingBottom: 'max(8.5rem, calc(env(safe-area-inset-bottom) + 6.5rem))' }}
       >
-        <ProfileHeader
-          streak={streak}
-          onLogout={handleLogout}
-          onOpenSettings={() => setShowSettings(true)}
-        />
-
         <RecoveryBanner
           currentCount={transactions.length}
           onRestored={() => {
@@ -249,8 +286,8 @@ export default function Home() {
         />
 
         {recurringAdded > 0 && (
-          <div className="clay clay-amber animate-pop-in flex items-center justify-between px-4 py-3 gap-2">
-            <span className="font-black text-amber-900 text-sm">
+          <div className="clay clay-amber animate-pop-in flex items-center justify-between px-4 py-3 gap-2 min-w-0 overflow-hidden">
+            <span className="font-black text-amber-900 text-sm min-w-0 flex-1 leading-snug">
               🔄 {recurringAdded} recurring {recurringAdded === 1 ? 'entry' : 'entries'} auto-added!
             </span>
             <button type="button" onClick={() => setRecurringAdded(0)}
@@ -260,97 +297,125 @@ export default function Home() {
           </div>
         )}
 
-        {/* 1. Add entry */}
-        <button
-          onClick={() => setShowForm(true)}
-          className="clay-btn clay-purple clay w-full py-4 text-lg font-black text-violet-900 text-center min-h-[52px]">
-          ➕ Add Income / Expense / Invest
-        </button>
+        {tab === 'home' && (
+          <>
+            <HomeDashboard
+              expense={monthExpense}
+              income={monthIncome}
+              budget={budget}
+              month={monthCursor}
+              onMonthChange={delta => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))}
+              onSetBudget={() => { setBudgetDraft(budget > 0 ? String(budget) : ''); setShowBudget(true); }}
+              activeCategory={activeCategory}
+              incomeNotSet={monthIncome === 0}
+            />
 
-        {/* Split group pinned cards — only pinned ones */}
-        {splitEnabled && splitGroups.filter(g => !g.settled && g.pinned).map(g => {
-          const net = groupNetTotal(g);
-          return (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => { setSplitGroupId(g.id); setShowSplitTab(true); }}
-              className="clay-btn clay w-full px-4 py-3 flex items-center justify-between min-h-[48px]">
-              <div className="flex items-center gap-2 min-w-0">
-                <span>✂️</span>
-                <span className="font-black text-stone-800 truncate">{g.name}</span>
-                <span className="text-xs font-semibold text-stone-400 truncate hidden sm:inline">{g.members.join(', ')}</span>
+            {splitEnabled && splitGroups.filter(g => !g.settled && g.pinned).map(g => {
+              const net = groupNetTotal(g);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => { setSplitGroupId(g.id); setShowSplitTab(true); }}
+                  className="clay-btn clay w-full px-4 py-3 flex items-center justify-between min-h-[48px]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span>✂️</span>
+                    <span className="font-black text-stone-800 truncate">{g.name}</span>
+                  </div>
+                  <span className={`text-xs font-black shrink-0 ml-2 ${net === 0 ? 'text-stone-400' : net > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {net === 0 ? 'All even' : net > 0 ? `+₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `-₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+                  </span>
+                </button>
+              );
+            })}
+
+            {showBudget && (
+              <div className="clay animate-pop-in grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 p-3 items-center min-w-0">
+                <span className="text-stone-500 font-black text-sm">₹</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  value={budgetDraft}
+                  onChange={e => setBudgetDraft(e.target.value.replace(/[^\d.]/g, ''))}
+                  onKeyDown={e => e.key === 'Enter' && saveBudget()}
+                  placeholder="Monthly limit (0 to clear)"
+                  className="clay w-full min-w-0 px-3 py-2.5 bg-transparent outline-none font-bold text-stone-700 placeholder:text-stone-400"
+                />
+                <button type="button" onClick={saveBudget}
+                  className="clay-btn bg-violet-500 text-white font-black text-xs px-3 py-1.5 rounded-[10px] shrink-0">
+                  Save
+                </button>
               </div>
-              <span className={`text-xs font-black shrink-0 ml-2 ${net === 0 ? 'text-stone-400' : net > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {net === 0 ? 'All even' : net > 0 ? `+₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `-₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              </span>
-            </button>
-          );
-        })}
+            )}
 
-        {/* Split groups button */}
-        {splitEnabled && (
-          <button
-            type="button"
-            onClick={() => { setSplitGroupId(undefined); setShowSplitTab(true); }}
-            className="clay-btn clay w-full py-3 font-bold text-stone-600 text-center text-sm min-h-[44px]">
-            ✂️ Split Groups
-          </button>
+            <div className="sheet-card -mx-4 mt-1 min-h-[46vh] px-4 pb-4 pt-2">
+              <SiriHoldTop />
+              <div className="flex flex-col gap-3 pt-2">
+                <EntrySearch value={search} onChange={v => setSearch(v)} />
+                {categories.length > 0 && (
+                  <ViewModeBar categories={categories} viewMode={viewMode} onSelect={setViewMode} />
+                )}
+                {splitEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => { setSplitGroupId(undefined); setShowSplitTab(true); }}
+                    className="clay-btn clay w-full py-3 font-bold text-stone-600 text-center text-sm min-h-[44px]">
+                    ✂️ Split Groups
+                  </button>
+                )}
+                <TransactionList
+                  transactions={viewTransactions}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
+                  walletFilter={walletFilter}
+                  categoryFilter={categoryFilter}
+                  onRecurringChange={handleRecurringChange}
+                  search={search}
+                  onSearchChange={setSearch}
+                  hideSearchBar
+                  onOpenSplitGroup={id => { setSplitGroupId(id); setShowSplitTab(true); }}
+                />
+                <LowBalanceAlert transactions={transactions} />
+                <CreditCardReminders transactions={transactions} />
+              </div>
+            </div>
+          </>
         )}
 
-        {/* 2. Monthly stats */}
-        <StatsBar
-          transactions={statsTransactions}
-          budget={budget}
-          categories={categories}
-          categoryFilter={categoryFilter}
-          transfers={transfers}
-        />
-
-        {/* 3. Search + category filter */}
-        <EntrySearch value={search} onChange={v => setSearch(v)} />
-
-        {categories.length > 0 && (
-          <ViewModeBar categories={categories} viewMode={viewMode} onSelect={setViewMode} />
+        {tab === 'insights' && (
+          <div className="flex flex-col gap-4">
+            <h1 className="text-[28px] font-black text-white">Insights</h1>
+            {transactions.length === 0 ? (
+              <p className="rounded-[16px] border border-white/10 px-4 py-3 text-center text-sm font-semibold text-zinc-400">
+                Add transactions to get AI insights
+              </p>
+            ) : (
+              <MoreSection {...moreProps} pane="insights" />
+            )}
+          </div>
         )}
 
-        {/* 4. Transaction list */}
-        <TransactionList
-          transactions={viewTransactions}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-          walletFilter={walletFilter}
-          categoryFilter={categoryFilter}
-          onRecurringChange={handleRecurringChange}
-          search={search}
-          onSearchChange={setSearch}
-          hideSearchBar
-          onOpenSplitGroup={id => { setSplitGroupId(id); setShowSplitTab(true); }}
-        />
+        {tab === 'tools' && <MoreSection {...moreProps} pane="tools" />}
 
-        {/* 5. Low balance alert */}
-        <LowBalanceAlert transactions={transactions} />
-
-        {/* Credit card statement / due reminders */}
-        <CreditCardReminders transactions={transactions} />
-
-        {/* Everything else tucked away */}
-        <MoreSection
-          transactions={transactions}
-          viewTransactions={viewTransactions}
-          transfers={transfers}
-          categories={categories}
-          viewMode={viewMode}
-          walletFilter={walletFilter}
-          onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
-          budget={budget}
-          onSetBudget={setBudget}
-          onRefresh={refresh}
-          recurringRefresh={recurringRefresh}
-          onTransfer={() => { reloadTransfers(); reloadCategories(); refresh(); }}
-          onTransferUndo={() => { reloadTransfers(); refresh(); }}
-        />
+        {tab === 'settings' && (
+          <div className="flex flex-col gap-4">
+            <ProfileHeader
+              streak={streak}
+              onLogout={handleLogout}
+              onOpenSettings={() => {}}
+            />
+            <SettingsPanel
+              embedded
+              onClose={() => { setTab('home'); reloadSplits(); }}
+              onChange={() => { reloadCategories(); reloadTransfers(); refresh(); reloadSplits(); }}
+              onReset={handleFullReset}
+            />
+          </div>
+        )}
       </div>
+
+      <BottomDock tab={tab} onTab={setTab} onAdd={() => setShowForm(true)} />
 
       {showForm && (
         <div
@@ -393,19 +458,12 @@ export default function Home() {
           setShowOnboarding(false);
         }} />
       )}
-      {showSettings && (
-        <SettingsPanel
-          onClose={() => { setShowSettings(false); reloadSplits(); }}
-          onChange={() => { reloadCategories(); reloadTransfers(); refresh(); reloadSplits(); }}
-          onReset={handleFullReset}
-        />
-      )}
 
-      {/* Sticky hold-to-talk — always within thumb reach at the bottom */}
-      {voiceEnabled && !showForm && !showSettings && !showSplitTab && !voiceResult && !showOnboarding && !showStreakPopup && (
+      {/* Sticky hold-to-talk — sits just above the dock */}
+      {voiceEnabled && !showForm && tab !== 'settings' && !showSplitTab && !voiceResult && !showOnboarding && !showStreakPopup && (
         <div
           className="fixed inset-x-0 z-30 flex justify-center px-4 pointer-events-none"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)' }}>
           <div className="w-full max-w-md pointer-events-auto">
             <VoiceButton
               variant="bar"

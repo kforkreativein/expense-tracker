@@ -106,32 +106,6 @@ export default function StatsBar({ transactions, budget, categories, categoryFil
         </div>
       </div>
 
-      {/* Category budget bar */}
-      {activeCategory && categoryBudget > 0 && catTotals && (
-        <div className="px-1">
-          <div className="h-1.5 rounded-full bg-violet-200/60 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${categoryOver ? 'bg-violet-700' : 'bg-violet-400'}`} style={{ width: `${categoryPct * 100}%` }} />
-          </div>
-          <p className="text-[10px] font-bold text-violet-800/70 mt-0.5">
-            {categoryOver
-              ? `${activeCategory.emoji} ${activeCategory.name} over by ${fmt(catTotals.expense - categoryBudget)}`
-              : `${fmt(categoryBudget - catTotals.expense)} left of ${fmt(categoryBudget)} ${activeCategory.name} budget`}
-          </p>
-        </div>
-      )}
-
-      {/* Total expense budget bar */}
-      {!categoryFilter && budget > 0 && (
-        <div className="px-1">
-          <div className="budget-meter__track" role="progressbar" aria-valuenow={Math.round(budgetPct * 100)} aria-valuemin={0} aria-valuemax={100}>
-            <div className={`budget-meter__fill ${overBudget ? 'is-over' : ''}`} style={{ width: `${budgetPct * 100}%` }} />
-          </div>
-          <p className="text-[10px] font-bold text-red-800/70 mt-0.5">
-            {overBudget ? `Over total budget by ${fmt(expense - budget)}` : `${fmt(budget - expense)} left of ${fmt(budget)} total expense budget`}
-          </p>
-        </div>
-      )}
-
       {/* Row 2: Investment + Net Income side by side */}
       <div className="grid grid-cols-2 gap-3">
         <div className="clay clay-blue p-4 flex flex-col gap-1">
@@ -156,6 +130,30 @@ export default function StatsBar({ transactions, budget, categories, categoryFil
           </span>
         </div>
       </div>
+
+      {activeCategory && categoryBudget > 0 && catTotals && (
+        <div className="px-1 pt-1">
+          <div className="h-1.5 rounded-full bg-violet-200/60 overflow-hidden">
+            <div className={`h-full rounded-full transition-all duration-500 ${categoryOver ? 'bg-violet-700' : 'bg-violet-400'}`} style={{ width: `${categoryPct * 100}%` }} />
+          </div>
+          <p className="text-[10px] font-bold text-violet-800/70 mt-1 leading-snug">
+            {categoryOver
+              ? `${activeCategory.emoji} ${activeCategory.name} over by ${fmt(catTotals.expense - categoryBudget)}`
+              : `${fmt(categoryBudget - catTotals.expense)} left of ${fmt(categoryBudget)} ${activeCategory.name} budget`}
+          </p>
+        </div>
+      )}
+
+      {!categoryFilter && budget > 0 && (
+        <div className="px-1 pt-1">
+          <div className="budget-meter__track" role="progressbar" aria-valuenow={Math.round(budgetPct * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <div className={`budget-meter__fill ${overBudget ? 'is-over' : ''}`} style={{ width: `${budgetPct * 100}%` }} />
+          </div>
+          <p className="text-[10px] font-bold text-red-800/70 mt-1 leading-snug">
+            {overBudget ? `Over total budget by ${fmt(expense - budget)}` : `${fmt(budget - expense)} left of ${fmt(budget)} total expense budget`}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

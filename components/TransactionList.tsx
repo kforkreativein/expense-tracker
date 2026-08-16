@@ -169,7 +169,7 @@ export default function TransactionList({
           <span className="text-5xl">{q ? '🔍' : '🪙'}</span>
           <p className="text-lg font-black text-stone-700">{q ? 'No results' : 'No entries yet!'}</p>
           <p className="text-sm font-semibold text-stone-500">
-            {q ? `Nothing matching "${search}"` : categoryFilter ? 'No entries in this category yet' : 'Add your first entry above ☝️'}
+            {q ? `Nothing matching "${search}"` : categoryFilter ? 'No entries in this category yet' : 'No expenses yet. Tap + to add your first entry'}
           </p>
         </div>
       ) : (

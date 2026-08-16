@@ -61,9 +61,12 @@ export function suggestedWalletForCategory(category: Category, wallets: Wallet[]
   if (category.walletId && wallets.some(wallet => wallet.id === category.walletId)) return category.walletId;
 
   const name = category.name.trim().toLowerCase();
-  const matchByName = (needle: string) => wallets.find(wallet =>
-    `${wallet.id} ${wallet.name}`.toLowerCase().includes(needle),
-  )?.id;
+  const matchByName = (needle: string) => {
+    const hit = (wallet: Wallet) => `${wallet.id} ${wallet.name}`.toLowerCase().includes(needle);
+    const bank = wallets.find(wallet => hit(wallet) && !wallet.isCreditCard);
+    if (bank) return bank.id;
+    return wallets.find(hit)?.id;
+  };
 
   if (name.includes('saving')) return matchByName('hdfc') ?? matchByName('saving');
   if (name.includes('business')) return matchByName('idfc') ?? matchByName('business');
