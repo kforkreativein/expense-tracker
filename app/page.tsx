@@ -21,8 +21,7 @@ import { isInMonth } from '@/lib/insights';
 import { sumRealExpense, sumRealIncome } from '@/lib/transfers';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
-import ProfileHeader from '@/components/ProfileHeader';
-import SettingsPanel from '@/components/SettingsPanel';
+import SettingsHub from '@/components/SettingsHub';
 import StreakPopup from '@/components/StreakPopup';
 import TransactionForm from '@/components/TransactionForm';
 import TransactionList from '@/components/TransactionList';
@@ -72,6 +71,8 @@ export default function Home() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [txFilter, setTxFilter] = useState<TxFilter>('all');
   const [importError, setImportError] = useState('');
+  const [voiceSubDrafts, setVoiceSubDrafts] = useState<{ name: string; amount: number }[] | undefined>();
+  const [subVoiceMode, setSubVoiceMode] = useState(false);
 
   const refresh = useCallback(() => setTransactions(getTransactions()), []);
   const reloadSplits = useCallback(() => {
@@ -241,10 +242,20 @@ export default function Home() {
 
   const handleVoiceResult = useCallback((data: VoiceResult) => {
     voiceSeq.current += 1;
-    setVoiceResult({ id: voiceSeq.current, data });
     setShowVoiceBar(false);
     setVoiceAutoStart(false);
-  }, []);
+    if (subVoiceMode && data.intent === 'entries' && data.entries?.length) {
+      setVoiceSubDrafts(
+        data.entries
+          .filter(e => e.amount > 0)
+          .map(e => ({ name: e.description || 'Subscription', amount: e.amount })),
+      );
+      setSubVoiceMode(false);
+      setTab('tools');
+      return;
+    }
+    setVoiceResult({ id: voiceSeq.current, data });
+  }, [subVoiceMode]);
 
   const handleVoiceSave = useCallback((txns: Transaction[]) => {
     addTransactions(txns);
@@ -457,23 +468,24 @@ export default function Home() {
             walletFilter={walletFilter}
             onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
             recurringRefresh={recurringRefresh}
+            voiceEnabled={voiceEnabled}
+            onRequestVoice={() => {
+              setSubVoiceMode(true);
+              setShowVoiceBar(true);
+              setVoiceAutoStart(true);
+            }}
+            voiceSubDrafts={voiceSubDrafts}
+            onVoiceSubDraftsConsumed={() => setVoiceSubDrafts(undefined)}
           />
         )}
 
         {tab === 'settings' && (
-          <div className="flex flex-col gap-4">
-            <ProfileHeader
-              streak={streak}
-              onLogout={handleLogout}
-              onOpenSettings={() => {}}
-            />
-            <SettingsPanel
-              embedded
-              onClose={() => { setTab('home'); reloadSplits(); }}
-              onChange={() => { reloadCategories(); reloadTransfers(); refresh(); reloadSplits(); }}
-              onReset={handleFullReset}
-            />
-          </div>
+          <SettingsHub
+            streak={streak}
+            onLogout={handleLogout}
+            onChange={() => { reloadCategories(); reloadTransfers(); refresh(); reloadSplits(); }}
+            onReset={handleFullReset}
+          />
         )}
       </div>
 

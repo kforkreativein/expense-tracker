@@ -125,3 +125,5 @@
 | 76 | AI Insights tab | ✅ Completed | Pacing / top-category cards with refresh; charts & wallets live here |
 | 77 | Financial Tools tab | ✅ Completed | Subscriptions, EMIs, wallets, FD/RD + tax + EMI calculators, CSV export |
 | 78 | Streak once-per-local-day | ✅ Completed | Uses local calendar date (not UTC); cloud merge keeps fresher visit; popup at most once/day |
+| 79 | Premium Settings hub | ✅ Completed | AboutMoney-style account home: profile, categories, notifications, backup/export/share — no premium locks |
+| 80 | Subscriptions + calendar | ✅ Completed | Orbital hub from Financial Tools; add via catalog/voice; filters (list/category/cycle); renewal calendar & notifications |

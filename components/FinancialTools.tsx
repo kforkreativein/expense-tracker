@@ -6,6 +6,7 @@ import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { fmt } from '@/lib/insights';
 import BottomTools from './BottomTools';
 import WalletBar from './WalletBar';
+import SubscriptionsApp from './SubscriptionsApp';
 
 interface Commitment {
   id: string;
@@ -24,6 +25,10 @@ interface Props {
   walletFilter: string | null;
   onWalletFilter: (id: string) => void;
   recurringRefresh?: number;
+  voiceEnabled?: boolean;
+  onRequestVoice?: () => void;
+  voiceSubDrafts?: { name: string; amount: number }[];
+  onVoiceSubDraftsConsumed?: () => void;
 }
 
 function loadCommitments(): Commitment[] {
@@ -41,9 +46,11 @@ function saveCommitments(list: Commitment[]) {
 
 export default function FinancialTools({
   transactions, budget, expense, onSetBudget, onRefresh, walletFilter, onWalletFilter, recurringRefresh = 0,
+  voiceEnabled, onRequestVoice, voiceSubDrafts, onVoiceSubDraftsConsumed,
 }: Props) {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
-  const [showAdd, setShowAdd] = useState<'subscription' | 'emi' | null>(null);
+  const [showAdd, setShowAdd] = useState<'emi' | null>(null);
+  const [showSubs, setShowSubs] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [calc, setCalc] = useState<'fd' | 'emi' | 'tax' | null>(null);
@@ -65,8 +72,12 @@ export default function FinancialTools({
 
   const left = budget > 0 ? Math.max(0, budget - expense) : 0;
   const pct = budget > 0 ? Math.min(1, expense / budget) : 0;
-  const subs = commitments.filter(c => c.kind === 'subscription');
   const emis = commitments.filter(c => c.kind === 'emi');
+
+  // Auto-open when voice drafts arrive
+  useEffect(() => {
+    if (voiceSubDrafts?.length) setShowSubs(true);
+  }, [voiceSubDrafts]);
 
   const fdMaturity = useMemo(() => {
     const p = Number(principal) || 0;
@@ -124,6 +135,16 @@ export default function FinancialTools({
 
   return (
     <div className="flex flex-col gap-5">
+      {showSubs && (
+        <SubscriptionsApp
+          onClose={() => setShowSubs(false)}
+          voiceEnabled={voiceEnabled}
+          onRequestVoice={onRequestVoice}
+          voiceDrafts={voiceSubDrafts}
+          onVoiceDraftsConsumed={onVoiceSubDraftsConsumed}
+        />
+      )}
+
       <h1 className="px-1 text-[28px] font-black text-white">Financial Tools</h1>
 
       <div className="rounded-[16px] bg-[#1c1c1e] border border-white/8 px-4 py-3">
@@ -150,28 +171,12 @@ export default function FinancialTools({
       <section>
         <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">Commitments</p>
         <div className="rounded-[16px] bg-[#1c1c1e] border border-white/8 divide-y divide-white/8 overflow-hidden">
-          <button type="button" onClick={() => setShowAdd(showAdd === 'subscription' ? null : 'subscription')}
+          <button type="button" onClick={() => setShowSubs(true)}
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left min-h-[52px]">
             <span className="text-lg">⏱</span>
             <span className="flex-1 font-semibold text-white">Subscriptions</span>
-            <span className="text-sm text-zinc-500">{subs.length ? `${subs.length}` : 'None yet'} ›</span>
+            <span className="text-sm text-zinc-500">Track & renew ›</span>
           </button>
-          {showAdd === 'subscription' && (
-            <div className="px-4 py-3 flex flex-col gap-2 bg-black/20">
-              {subs.map(s => (
-                <div key={s.id} className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-200">{s.name} · {fmt(s.amount)}</span>
-                  <button type="button" onClick={() => removeCommitment(s.id)} className="text-rose-400 font-bold">✕</button>
-                </div>
-              ))}
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Netflix"
-                className="clay px-3 py-2.5 font-bold outline-none" />
-              <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder="Amount / month"
-                inputMode="numeric" className="clay px-3 py-2.5 font-bold outline-none" />
-              <button type="button" onClick={() => addCommitment('subscription')}
-                className="clay-btn bg-emerald-500 text-white font-black py-2.5 rounded-[12px]">+ Add subscription</button>
-            </div>
-          )}
           <button type="button" onClick={() => setShowAdd(showAdd === 'emi' ? null : 'emi')}
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left min-h-[52px]">
             <span className="text-lg">↻</span>
