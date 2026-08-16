@@ -41,6 +41,18 @@ export function clearCategoryFromTransactions(categoryId: string) {
   ));
 }
 
+export function clearSpendCategoryFromTransactions(spendCategoryId: string) {
+  save(getTransactions().map(t =>
+    t.spendCategoryId === spendCategoryId ? { ...t, spendCategoryId: undefined } : t
+  ));
+}
+
+/** Append several entries in one write so cloud sync fires once. */
+export function addTransactions(txns: Transaction[]) {
+  if (!txns.length) return;
+  save([...getTransactions(), ...txns]);
+}
+
 /** Give older entries an explicit wallet, using their original GPay/Cash choice. */
 export function migrateTransactionsToWallets(): boolean {
   const transactions = getTransactions();

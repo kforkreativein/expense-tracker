@@ -17,6 +17,10 @@ export interface Wallet {
   dueDay?: number;
 }
 
+/**
+ * A money bucket shown in the app as a "Type" (Personal, Business, Savings…).
+ * Types drive the dashboard view switcher and wallet transfers.
+ */
 export interface Category {
   id: string;
   name: string;
@@ -28,6 +32,18 @@ export interface Category {
 
 /** @deprecated use Category */
 export type ExpenseCategory = Category;
+
+/**
+ * What the money was spent on (Food, Transport, Shopping…). Independent of
+ * `Category`/Type, which answers *which pocket* the money came from.
+ */
+export interface SpendCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  /** Monthly spending limit; 0 means no limit set */
+  budget: number;
+}
 
 /** A movement of money between two wallets. It is excluded from income and expense totals. */
 export interface WalletTransfer {
@@ -76,6 +92,8 @@ export interface Transaction {
   bank?: Bank;
   walletId?: string;
   categoryId?: string;
+  /** What the money was spent on — see SpendCategory */
+  spendCategoryId?: string;
   recurringRuleId?: string;
   date: string;
   createdAt: number;

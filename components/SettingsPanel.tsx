@@ -1,8 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Category } from '@/lib/types';
+import { Category, SpendCategory } from '@/lib/types';
 import { getCategories, addCategory, updateCategory, deleteCategory, suggestedWalletForCategory } from '@/lib/categories';
-import { clearCategoryFromTransactions } from '@/lib/storage';
+import {
+  getSpendCategories,
+  addSpendCategory,
+  updateSpendCategory,
+  deleteSpendCategory,
+  restoreDefaultSpendCategories,
+  DEFAULT_SPEND_CATEGORIES,
+} from '@/lib/spendCategories';
+import { clearCategoryFromTransactions, clearSpendCategoryFromTransactions } from '@/lib/storage';
 import EmojiPicker from './EmojiPicker';
 import {
   canUseNotifications,
@@ -28,6 +36,10 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
   const [newName, setNewName] = useState('');
   const [newEmoji, setNewEmoji] = useState('🏷️');
   const [budgetDrafts, setBudgetDrafts] = useState<Record<string, string>>({});
+  const [spendCategories, setSpendCategories] = useState<SpendCategory[]>([]);
+  const [newSpendName, setNewSpendName] = useState('');
+  const [newSpendEmoji, setNewSpendEmoji] = useState('🍔');
+  const [spendBudgetDrafts, setSpendBudgetDrafts] = useState<Record<string, string>>({});
   const [notifOn, setNotifOn] = useState(false);
   const [notifMsg, setNotifMsg] = useState('');
   const [ccOn, setCcOn] = useState(false);
@@ -41,6 +53,11 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
     setWallets(getWallets());
     setBudgetDrafts(Object.fromEntries(
       cats.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
+    ));
+    const spendCats = getSpendCategories();
+    setSpendCategories(spendCats);
+    setSpendBudgetDrafts(Object.fromEntries(
+      spendCats.map(c => [c.id, c.budget > 0 ? String(c.budget) : ''])
     ));
   }
 
@@ -88,6 +105,30 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
   function saveBudget(id: string) {
     const val = Number(budgetDrafts[id] || 0);
     updateCategory(id, { budget: val > 0 ? val : 0 });
+    reload();
+    onChange();
+  }
+
+  function handleAddSpend() {
+    const name = newSpendName.trim();
+    if (!name) return;
+    addSpendCategory(name, newSpendEmoji);
+    setNewSpendName('');
+    setNewSpendEmoji('🍔');
+    reload();
+    onChange();
+  }
+
+  function handleDeleteSpend(id: string) {
+    deleteSpendCategory(id);
+    clearSpendCategoryFromTransactions(id);
+    reload();
+    onChange();
+  }
+
+  function saveSpendBudget(id: string) {
+    const val = Number(spendBudgetDrafts[id] || 0);
+    updateSpendCategory(id, { budget: val > 0 ? val : 0 });
     reload();
     onChange();
   }
@@ -176,15 +217,15 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
           </div>
 
           <div className="clay p-3 flex flex-col gap-1">
-            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Categories</p>
+            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Types</p>
             <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-              Tag income and expenses (for example, Personal or Business). Wallet transfers are handled separately from categories.
+              Which pocket the money belongs to — for example Personal, Business or Savings. Types are the tabs in the 👁️ View bar. Wallet transfers are handled separately.
             </p>
           </div>
 
           {categories.length === 0 ? (
             <p className="text-sm font-semibold text-stone-400 text-center py-4 clay rounded-[14px]">
-              No categories yet. Add one below!
+              No types yet. Add one below!
             </p>
           ) : (
             <div className="flex flex-col gap-2">
@@ -240,9 +281,9 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
           )}
 
           <div className="clay p-3 flex flex-col gap-2">
-            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Add category</p>
+            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Add type</p>
             <div className="flex gap-2 items-center">
-              <EmojiPicker value={newEmoji} onChange={setNewEmoji} label="Category icon" />
+              <EmojiPicker value={newEmoji} onChange={setNewEmoji} label="Type icon" />
               <input
                 type="text"
                 value={newName}
@@ -257,8 +298,96 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
               onClick={handleAdd}
               disabled={!newName.trim()}
               className="clay-btn py-3 bg-violet-500 text-white font-black rounded-[12px] disabled:opacity-40">
-              + Add Category
+              + Add Type
             </button>
+          </div>
+
+          <div className="clay p-3 flex flex-col gap-1">
+            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Spending categories</p>
+            <p className="text-xs font-semibold text-stone-500 leading-relaxed">
+              What the money went on — Food, Transport, Shopping and so on. Set a monthly limit to keep an eye on any of them.
+            </p>
+          </div>
+
+          {spendCategories.length === 0 ? (
+            <div className="clay p-4 flex flex-col items-center gap-3 text-center rounded-[14px]">
+              <p className="text-sm font-semibold text-stone-400">No spending categories yet.</p>
+              <button
+                type="button"
+                onClick={() => { restoreDefaultSpendCategories(); reload(); onChange(); }}
+                className="clay-btn clay-amber px-4 py-2.5 rounded-[12px] font-black text-amber-900 text-sm">
+                ✨ Add the {DEFAULT_SPEND_CATEGORIES.length} starter categories
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {spendCategories.map(cat => (
+                <div key={cat.id} className="clay p-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{cat.emoji}</span>
+                    <span className="font-black text-stone-800 flex-1">{cat.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSpend(cat.id)}
+                      className="clay-btn text-rose-400 text-xs px-2 py-1 rounded-[8px]">
+                      Delete
+                    </button>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <span className="text-xs font-bold text-stone-400">Limit</span>
+                    <span className="text-stone-400 font-black">₹</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={spendBudgetDrafts[cat.id] ?? ''}
+                      onChange={e => setSpendBudgetDrafts(d => ({ ...d, [cat.id]: e.target.value.replace(/[^\d]/g, '') }))}
+                      onKeyDown={e => e.key === 'Enter' && saveSpendBudget(cat.id)}
+                      placeholder="Monthly limit"
+                      className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none placeholder:text-stone-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveSpendBudget(cat.id)}
+                      className="clay-btn bg-violet-500 text-white font-black text-xs px-2.5 py-2 rounded-[8px]">
+                      Save
+                    </button>
+                  </div>
+                  {cat.budget > 0 && (
+                    <p className="text-[10px] font-bold text-amber-700">Limit set: {fmt(cat.budget)}/month</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="clay p-3 flex flex-col gap-2">
+            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Add spending category</p>
+            <div className="flex gap-2 items-center">
+              <EmojiPicker value={newSpendEmoji} onChange={setNewSpendEmoji} label="Spending category icon" />
+              <input
+                type="text"
+                value={newSpendName}
+                onChange={e => setNewSpendName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddSpend()}
+                placeholder="e.g. Food, Transport"
+                className="clay flex-1 px-3 py-2.5 font-bold text-stone-700 bg-transparent outline-none placeholder:text-stone-400"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleAddSpend}
+              disabled={!newSpendName.trim()}
+              className="clay-btn py-3 bg-amber-500 text-white font-black rounded-[12px] disabled:opacity-40">
+              + Add Spending Category
+            </button>
+            {spendCategories.length > 0 && spendCategories.length < DEFAULT_SPEND_CATEGORIES.length && (
+              <button
+                type="button"
+                onClick={() => { restoreDefaultSpendCategories(); reload(); onChange(); }}
+                className="clay-btn py-2.5 font-bold text-xs text-stone-500 bg-stone-100 border border-stone-200 rounded-[12px] shadow-none">
+                ↩️ Restore the starter categories
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Transaction, Wallet } from '@/lib/types';
 import { getWallets, legacyWalletId } from '@/lib/wallets';
 import { getCategories, getCategoryById } from '@/lib/categories';
+import { getSpendCategoryById } from '@/lib/spendCategories';
 import { findRuleForTransaction } from '@/lib/recurring';
 import { getTransfers, getInternalTransferTxnIds, isInternalTransferTxn, sumRealExpense, sumRealIncome } from '@/lib/transfers';
 import { getSplitGroups } from '@/lib/splits';
@@ -108,11 +109,13 @@ export default function TransactionList({
   const filtered = q
     ? sorted.filter(t => {
         const cat = t.categoryId ? getCategoryById(t.categoryId) : null;
+        const spendCat = t.spendCategoryId ? getSpendCategoryById(t.spendCategoryId) : null;
         return (
           t.description.toLowerCase().includes(q) ||
           t.date.includes(q) ||
           String(t.amount).includes(q) ||
-          (cat?.name.toLowerCase().includes(q) ?? false)
+          (cat?.name.toLowerCase().includes(q) ?? false) ||
+          (spendCat?.name.toLowerCase().includes(q) ?? false)
         );
       })
     : sorted;
@@ -248,6 +251,15 @@ export default function TransactionList({
                           return (
                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200">
                               {cat.emoji} {cat.name}
+                            </span>
+                          );
+                        })()}
+                        {!isSplit && txn.spendCategoryId && txn.type === 'expense' && (() => {
+                          const spendCat = getSpendCategoryById(txn.spendCategoryId!);
+                          if (!spendCat) return null;
+                          return (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                              {spendCat.emoji} {spendCat.name}
                             </span>
                           );
                         })()}

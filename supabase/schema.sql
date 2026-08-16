@@ -25,6 +25,7 @@ create table if not exists public.transactions (
   bank text,
   wallet_id text,
   category_id text,
+  spend_category_id text,
   date date not null,
   created_at bigint not null,
   recurring_rule_id text,
@@ -65,6 +66,20 @@ create table if not exists public.categories (
 
 alter table public.categories enable row level security;
 create policy "categories_all_own" on public.categories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Spending categories (Food, Transport, Shopping…) — separate from `categories`,
+-- which the app shows as "Type" (Personal / Business / Savings)
+create table if not exists public.spend_categories (
+  id text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  emoji text not null default '🏷️',
+  budget integer not null default 0,
+  primary key (user_id, id)
+);
+
+alter table public.spend_categories enable row level security;
+create policy "spend_categories_all_own" on public.spend_categories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Wallet transfers (the table name is retained for existing installations)
 create table if not exists public.category_transfers (
@@ -186,3 +201,4 @@ alter table public.split_groups add column if not exists former_members jsonb no
 alter table public.split_groups add column if not exists opening_balances jsonb not null default '{}';
 alter table public.user_settings add column if not exists cc_reminders_dismissed jsonb not null default '[]';
 alter table public.user_settings add column if not exists cc_reminders_notified jsonb not null default '[]';
+alter table public.transactions add column if not exists spend_category_id text;

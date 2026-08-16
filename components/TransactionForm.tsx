@@ -1,13 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Transaction, TxType, Frequency, Wallet, Category } from '@/lib/types';
+import { Transaction, TxType, Frequency, Wallet, Category, SpendCategory } from '@/lib/types';
 import { getWallets, addWallet, legacyWalletId, walletToPaymentMode } from '@/lib/wallets';
 import { getCategories, suggestedWalletForCategory } from '@/lib/categories';
+import { getSpendCategories } from '@/lib/spendCategories';
 import { findRuleForTransaction, syncRuleForTransaction } from '@/lib/recurring';
 import EmojiPicker from './EmojiPicker';
 
 interface Props {
   initial?: Transaction;
+  /** Pre-filled entry that has not been saved yet (voice capture) — keeps "new entry" wording. */
+  isDraft?: boolean;
   onSave: (txn: Transaction) => void;
   onCancel?: () => void;
   onRecurringChange?: () => void;
@@ -21,7 +24,7 @@ const FREQ_LABELS: Record<Frequency, string> = {
   monthly: '🗓️ Monthly',
 };
 
-export default function TransactionForm({ initial, onSave, onCancel, onRecurringChange }: Props) {
+export default function TransactionForm({ initial, isDraft = false, onSave, onCancel, onRecurringChange }: Props) {
   const [type, setType] = useState<TxType>(initial?.type ?? 'expense');
   const [amount, setAmount] = useState(initial?.amount?.toString() ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -38,12 +41,15 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
   const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
+  const [spendCategories, setSpendCategories] = useState<SpendCategory[]>([]);
+  const [spendCategoryId, setSpendCategoryId] = useState<string>('');
 
   useEffect(() => {
     const ws = getWallets();
     const cs = getCategories();
     setWallets(ws);
     setCategories(cs);
+    setSpendCategories(getSpendCategories());
     if (initial) {
       setType(initial.type);
       setAmount(String(initial.amount));
@@ -52,7 +58,8 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
       const defaultId = initial.walletId ?? legacyWalletId(initial.paymentMode, initial.bank);
       setWalletId(defaultId);
       setCategoryId(initial.categoryId ?? '');
-      const rule = findRuleForTransaction(initial);
+      setSpendCategoryId(initial.spendCategoryId ?? '');
+      const rule = isDraft ? undefined : findRuleForTransaction(initial);
       setRecurring(!!rule);
       setFrequency(rule?.frequency ?? 'monthly');
     } else {
@@ -63,13 +70,15 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
       setWalletId(ws[0]?.id ?? '');
       // Everyday entries should never start uncategorised by accident.
       setCategoryId(cs.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? '');
+      setSpendCategoryId('');
       setRecurring(false);
       setFrequency('monthly');
     }
-  }, [initial]);
+  }, [initial, isDraft]);
 
   useEffect(() => {
     if (type === 'investment') setCategoryId('');
+    if (type !== 'expense') setSpendCategoryId('');
   }, [type]);
 
   function handleAddWallet() {
@@ -99,6 +108,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
       paymentMode: pm.paymentMode,
       bank: pm.bank,
       categoryId: (type === 'income' || type === 'expense') && categoryId ? categoryId : undefined,
+      spendCategoryId: type === 'expense' && spendCategoryId ? spendCategoryId : undefined,
       recurringRuleId: initial?.recurringRuleId,
       date,
       createdAt: initial?.createdAt ?? Date.now(),
@@ -109,7 +119,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
     onRecurringChange?.();
   }
 
-  const isEdit = !!initial;
+  const isEdit = !!initial && !isDraft;
   const submitLabel = isEdit
     ? 'Save Changes ✅'
     : type === 'income'
@@ -121,7 +131,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
   return (
     <form onSubmit={handleSubmit} className="clay p-5 flex flex-col gap-4 max-h-[88dvh] overflow-y-auto overscroll-contain">
       <h2 className="text-lg font-black text-stone-700 text-center">
-        {isEdit ? `✏️ Edit Entry${recurring ? ' 🔄' : ''}` : '➕ New Entry'}
+        {isEdit ? `✏️ Edit Entry${recurring ? ' 🔄' : ''}` : isDraft ? '🎙️ Check & Save' : '➕ New Entry'}
       </h2>
 
       <div className="grid grid-cols-3 gap-2">
@@ -216,7 +226,7 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
 
       {(type === 'income' || type === 'expense') && categories.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Category (optional)</span>
+          <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Type (optional)</span>
           <div className="flex gap-2 flex-wrap">
             <button type="button" onClick={() => setCategoryId('')}
               className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
@@ -225,11 +235,31 @@ export default function TransactionForm({ initial, onSave, onCancel, onRecurring
             {categories.map(c => (
               <button key={c.id} type="button" onClick={() => {
                 setCategoryId(c.id);
-                // A category can suggest its own wallet; the user can still change it below.
+                // A type can suggest its own wallet; the user can still change it below.
                 setWalletId(suggestedWalletForCategory(c, wallets) ?? wallets[0]?.id ?? '');
               }}
                 className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
                   categoryId === c.id ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
+                }`}>
+                {c.emoji} {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {type === 'expense' && spendCategories.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Spent on (optional)</span>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => setSpendCategoryId('')}
+              className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
+                !spendCategoryId ? 'clay-amber text-amber-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
+              }`}>None</button>
+            {spendCategories.map(c => (
+              <button key={c.id} type="button" onClick={() => setSpendCategoryId(c.id)}
+                className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
+                  spendCategoryId === c.id ? 'clay-amber text-amber-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
                 }`}>
                 {c.emoji} {c.name}
               </button>
