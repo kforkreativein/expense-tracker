@@ -117,3 +117,5 @@
 | 68 | Spending categories, separate from Type | ✅ Completed | Food / Transport / Shopping etc. with their own monthly limit and chip on each expense. The old categories (Personal, Business, Savings) are now labelled "Type" since they drive the 👁️ View bar. Managed in Settings; own Supabase table |
 | 69 | Voice entry (hold to talk) | ✅ Completed | Hold the 🎤 next to Add, or double-tap for hands-free. Groq Whisper transcribes English + Hindi, a Groq model fills the fields, and the normal form opens pre-filled to confirm. Several amounts in one sentence become stacked editable cards with one Save all |
 | 70 | Voice questions | ✅ Completed | Ask "how much did I spend on food this month" and get the total, with the biggest entries and the category limit. Computed on the device, so no amounts are ever sent out |
+| 71 | Full reset (Settings) | ✅ Completed | Danger-zone button with a confirm modal; wipes entries, transfers, recurring and splits on device + cloud. Wallets / types / spending categories stay |
+| 72 | Auto spend-category from note | ✅ Completed | Typing "Zomato", "chai", "uber" etc. auto-selects Food / Transport / …; manual chip picks win |

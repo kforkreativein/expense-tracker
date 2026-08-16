@@ -8,6 +8,8 @@ interface Props {
   onResult: (result: VoiceResult) => void;
   /** Start listening immediately (deep link from the phone shortcut). */
   autoStart?: boolean;
+  /** Full-width hold-to-talk bar, or a compact icon next to Add. */
+  variant?: 'icon' | 'bar';
 }
 
 type Phase = 'idle' | 'starting' | 'recording' | 'sending';
@@ -38,7 +40,7 @@ function formatElapsed(ms: number): string {
 const subscribeNever = () => () => {};
 const serverSnapshot = () => false;
 
-export default function VoiceButton({ onResult, autoStart = false }: Props) {
+export default function VoiceButton({ onResult, autoStart = false, variant = 'icon' }: Props) {
   const supported = useSyncExternalStore(subscribeNever, isRecordingSupported, serverSnapshot);
   const [phase, setPhase] = useState<Phase>('idle');
   const [mode, setMode] = useState<Mode>('hold');
@@ -262,11 +264,25 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
         disabled={isBusy}
         aria-label={isRecording ? 'Stop recording' : 'Hold to record an entry by voice'}
         aria-pressed={isRecording}
-        className={`clay-btn clay shrink-0 w-[60px] min-h-[52px] flex items-center justify-center text-2xl relative select-none touch-none ${
-          isRecording ? 'clay-red' : isBusy ? 'clay-amber opacity-80' : 'clay-amber'
-        }`}
+        className={variant === 'bar'
+          ? `clay-btn clay w-full py-4 min-h-[56px] flex items-center justify-center gap-2 text-base font-black relative select-none touch-none ${
+              isRecording ? 'clay-red text-red-900' : isBusy ? 'clay-amber text-amber-900 opacity-80' : 'clay-amber text-amber-900'
+            }`
+          : `clay-btn clay shrink-0 w-[60px] min-h-[52px] flex items-center justify-center text-2xl relative select-none touch-none ${
+              isRecording ? 'clay-red' : isBusy ? 'clay-amber opacity-80' : 'clay-amber'
+            }`
+        }
         style={{ WebkitTouchCallout: 'none' }}>
         {isBusy && phase === 'sending' ? '⏳' : isRecording ? '⏺️' : '🎤'}
+        {variant === 'bar' && (
+          <span>
+            {isBusy && phase === 'sending'
+              ? 'Understanding…'
+              : isRecording
+                ? (mode === 'hold' ? 'Release to save' : 'Tap to stop')
+                : 'Hold to talk'}
+          </span>
+        )}
         {isRecording && (
           <span
             aria-hidden
@@ -279,7 +295,7 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
         <div
           role="status"
           className="fixed left-1/2 -translate-x-1/2 z-50 clay clay-amber animate-pop-in px-4 py-2.5 max-w-[20rem] text-center"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
+          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
           <p className="text-xs font-black text-amber-900">{hint}</p>
         </div>
       )}
@@ -288,7 +304,7 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
         <div
           role="alert"
           className="fixed left-1/2 -translate-x-1/2 z-50 clay clay-red animate-pop-in px-4 py-3 max-w-[20rem] flex items-start gap-2"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
+          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
           <p className="text-xs font-bold text-red-900 flex-1">{error}</p>
           <button
             type="button"
@@ -303,7 +319,7 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
       {(isRecording || phase === 'sending') && (
         <div
           className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
           <div className="clay animate-slide-up w-full max-w-sm px-4 py-3.5 flex items-center gap-3 pointer-events-auto">
             {phase === 'sending' ? (
               <>

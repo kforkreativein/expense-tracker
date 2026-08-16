@@ -23,21 +23,65 @@ export const DEFAULT_SPEND_CATEGORIES: SpendCategory[] = [
 ];
 
 /**
- * Extra words that should resolve to a category when spoken out loud. Kept here
- * so both the voice parser hint and the local fallback matcher stay in sync.
+ * Words that should resolve to a category, whether typed or spoken. Kept here so
+ * the form, the voice parser hint and the fallback matcher all stay in sync.
  */
 const ALIASES: Record<string, string[]> = {
-  sc_food: ['chai', 'tea', 'coffee', 'breakfast', 'lunch', 'dinner', 'snack', 'restaurant', 'hotel', 'zomato', 'swiggy', 'khana', 'nashta'],
-  sc_transport: ['auto', 'rickshaw', 'uber', 'ola', 'cab', 'taxi', 'petrol', 'diesel', 'fuel', 'bus', 'train', 'metro', 'parking'],
-  sc_groceries: ['sabzi', 'vegetables', 'kirana', 'blinkit', 'zepto', 'bigbasket', 'milk', 'doodh', 'ration'],
-  sc_shopping: ['clothes', 'kapde', 'shoes', 'amazon', 'flipkart', 'myntra'],
-  sc_home: ['rent', 'kiraya', 'repair', 'maid', 'furniture'],
-  sc_bills: ['bill', 'electricity', 'bijli', 'water', 'recharge', 'internet', 'wifi', 'mobile', 'gas', 'subscription'],
-  sc_health: ['medicine', 'dawai', 'doctor', 'hospital', 'gym', 'chemist', 'pharmacy'],
-  sc_fun: ['movie', 'cinema', 'game', 'party', 'outing', 'netflix', 'spotify'],
-  sc_travel: ['flight', 'trip', 'holiday', 'vacation', 'hotel booking', 'ticket'],
-  sc_gifts: ['gift', 'present', 'donation', 'shagun'],
+  sc_food: [
+    'chai', 'tea', 'coffee', 'cafe', 'breakfast', 'lunch', 'dinner', 'brunch', 'snack', 'snacks',
+    'restaurant', 'zomato', 'swiggy', 'eatsure', 'dominos', 'pizza', 'burger', 'mcd', 'mcdonalds',
+    'kfc', 'starbucks', 'biryani', 'thali', 'canteen', 'tiffin', 'khana', 'nashta',
+    'juice', 'icecream', 'dessert', 'bakery', 'samosa', 'food',
+  ],
+  sc_transport: [
+    'auto', 'rickshaw', 'uber', 'ola', 'rapido', 'cab', 'taxi', 'petrol', 'diesel', 'fuel', 'cng',
+    'bus', 'train', 'metro', 'parking', 'toll', 'yulu', 'scooter', 'bike', 'ride', 'travel card',
+    'transport', 'commute',
+  ],
+  sc_groceries: [
+    'sabzi', 'sabji', 'vegetables', 'veggies', 'kirana', 'blinkit', 'zepto', 'instamart',
+    'bigbasket', 'dmart', 'jiomart', 'milk', 'doodh', 'ration', 'atta', 'grocery', 'groceries',
+    'supermarket',
+  ],
+  sc_shopping: [
+    'clothes', 'kapde', 'shirt', 'jeans', 'shoes', 'amazon', 'flipkart', 'myntra', 'ajio',
+    'meesho', 'nykaa', 'watch', 'bag', 'shopping',
+  ],
+  sc_home: [
+    'rent', 'kiraya', 'repair', 'plumber', 'electrician', 'maid', 'bai', 'furniture', 'decor',
+    'society', 'maintenance', 'cleaning', 'home',
+  ],
+  sc_bills: [
+    'bill', 'bills', 'electricity', 'bijli', 'water', 'recharge', 'internet', 'wifi', 'broadband',
+    'jio', 'airtel', 'vodafone', 'postpaid', 'prepaid', 'dth', 'gas', 'cylinder', 'subscription',
+    'insurance', 'premium',
+  ],
+  sc_health: [
+    'medicine', 'medicines', 'dawai', 'doctor', 'hospital', 'clinic', 'dentist', 'gym', 'chemist',
+    'pharmacy', 'apollo', 'checkup', 'lab', 'therapy', 'health',
+  ],
+  sc_fun: [
+    'movie', 'movies', 'cinema', 'pvr', 'inox', 'bookmyshow', 'game', 'gaming', 'party', 'outing',
+    'netflix', 'spotify', 'hotstar', 'prime', 'concert', 'club', 'fun',
+  ],
+  sc_travel: [
+    'flight', 'flights', 'trip', 'holiday', 'vacation', 'irctc', 'makemytrip', 'goibibo', 'oyo',
+    'airbnb', 'hotel', 'resort', 'booking', 'visa', 'luggage',
+  ],
+  sc_gifts: ['gift', 'gifts', 'present', 'donation', 'charity', 'shagun', 'birthday', 'anniversary'],
 };
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Whole-word match, so "gift" does not fire on "gifted a" style false friends and
+ * short words like "gas" never match inside "gaskets".
+ */
+function mentions(text: string, word: string): boolean {
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(word)}([^\\p{L}\\p{N}]|$)`, 'iu').test(text);
+}
 
 export function getSpendCategories(): SpendCategory[] {
   if (typeof window === 'undefined') return DEFAULT_SPEND_CATEGORIES;
@@ -98,8 +142,9 @@ export function restoreDefaultSpendCategories(): SpendCategory[] {
 }
 
 /**
- * Best-effort text match, used when the voice parser returns a spoken name
- * instead of one of the ids it was given.
+ * Works out the category from free text — a typed note like "Zomato dinner" or a
+ * spoken phrase. Also used when the voice parser hands back a name instead of one
+ * of the ids it was given.
  */
 export function matchSpendCategory(text: string, categories: SpendCategory[]): SpendCategory | undefined {
   const q = text.trim().toLowerCase();
@@ -111,13 +156,13 @@ export function matchSpendCategory(text: string, categories: SpendCategory[]): S
   const byId = categories.find(c => c.id.toLowerCase() === q);
   if (byId) return byId;
 
-  const partial = categories.find(c => q.includes(c.name.toLowerCase()));
-  if (partial) return partial;
+  // A category the user named themselves should win over any built-in alias
+  const named = categories.find(c => mentions(q, c.name.toLowerCase()));
+  if (named) return named;
 
-  for (const [id, words] of Object.entries(ALIASES)) {
-    if (!words.some(w => q.includes(w))) continue;
-    const hit = categories.find(c => c.id === id);
-    if (hit) return hit;
+  for (const category of categories) {
+    const words = ALIASES[category.id];
+    if (words?.some(word => mentions(q, word))) return category;
   }
   return undefined;
 }

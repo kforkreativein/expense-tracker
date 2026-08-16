@@ -21,6 +21,7 @@ import {
 import { getCreditCardsEnabled, setCreditCardsEnabled, getSplitEnabled, setSplitEnabled } from '@/lib/settings';
 import { getTheme, setTheme, Theme } from '@/lib/theme';
 import { getWallets } from '@/lib/wallets';
+import { resetAllData } from '@/lib/reset';
 
 function fmt(n: number) {
   return `₹${n.toLocaleString('en-IN')}`;
@@ -29,9 +30,47 @@ function fmt(n: number) {
 interface Props {
   onClose: () => void;
   onChange: () => void;
+  /** Called after a full reset so the dashboard can reload from scratch. */
+  onReset?: () => void;
 }
 
-export default function SettingsPanel({ onClose, onChange }: Props) {
+type OpenSection = 'types' | 'spend' | null;
+
+/** Long lists stay folded away so Settings does not turn into endless scrolling. */
+function Collapsible({
+  title, subtitle, count, open, onToggle, children,
+}: {
+  title: string;
+  subtitle: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="clay clay-btn px-4 py-3 flex items-center gap-2 text-left min-h-[52px]">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{title}</p>
+          <p className="text-[11px] font-semibold text-stone-400 truncate">{subtitle}</p>
+        </div>
+        <span className="text-[11px] font-black text-stone-400 shrink-0">{count}</span>
+        <span className="text-stone-400 text-xs shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div className="flex flex-col gap-2 animate-pop-in">{children}</div>}
+    </div>
+  );
+}
+
+export default function SettingsPanel({ onClose, onChange, onReset }: Props) {
+  const [openSection, setOpenSection] = useState<OpenSection>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState('');
   const [newEmoji, setNewEmoji] = useState('🏷️');
@@ -133,6 +172,21 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
     onChange();
   }
 
+  async function handleReset() {
+    setResetting(true);
+    const outcome = await resetAllData();
+    setResetting(false);
+    setConfirmReset(false);
+    setResetMsg(
+      outcome.cloudCleared
+        ? 'Everything is cleared. You are starting fresh.'
+        : 'Cleared on this device. The cloud copy will clear next time you are online.',
+    );
+    reload();
+    onReset?.();
+    onChange();
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -216,18 +270,23 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
             </button>
           </div>
 
-          <div className="clay p-3 flex flex-col gap-1">
-            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Types</p>
-            <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-              Which pocket the money belongs to — for example Personal, Business or Savings. Types are the tabs in the 👁️ View bar. Wallet transfers are handled separately.
-            </p>
-          </div>
+          <Collapsible
+            title="Types"
+            subtitle="Personal, Business, Savings — the 👁️ View tabs"
+            count={categories.length}
+            open={openSection === 'types'}
+            onToggle={() => setOpenSection(s => (s === 'types' ? null : 'types'))}>
+            <div className="clay p-3">
+              <p className="text-xs font-semibold text-stone-500 leading-relaxed">
+                Which pocket the money belongs to. Types are the tabs in the 👁️ View bar. Wallet transfers are handled separately.
+              </p>
+            </div>
 
-          {categories.length === 0 ? (
-            <p className="text-sm font-semibold text-stone-400 text-center py-4 clay rounded-[14px]">
-              No types yet. Add one below!
-            </p>
-          ) : (
+            {categories.length === 0 ? (
+              <p className="text-sm font-semibold text-stone-400 text-center py-4 clay rounded-[14px]">
+                No types yet. Add one below!
+              </p>
+            ) : (
             <div className="flex flex-col gap-2">
               {categories.map(cat => (
                 <div key={cat.id} className="clay p-3 flex flex-col gap-2">
@@ -301,13 +360,19 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
               + Add Type
             </button>
           </div>
+          </Collapsible>
 
-          <div className="clay p-3 flex flex-col gap-1">
-            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">Spending categories</p>
-            <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-              What the money went on — Food, Transport, Shopping and so on. Set a monthly limit to keep an eye on any of them.
-            </p>
-          </div>
+          <Collapsible
+            title="Spending categories"
+            subtitle="Food, Transport, Shopping — what the money went on"
+            count={spendCategories.length}
+            open={openSection === 'spend'}
+            onToggle={() => setOpenSection(s => (s === 'spend' ? null : 'spend'))}>
+            <div className="clay p-3">
+              <p className="text-xs font-semibold text-stone-500 leading-relaxed">
+                Typed or spoken notes like Zomato, Swiggy, chai or Uber pick a category for you. You can still change it. Set a monthly limit on any of them.
+              </p>
+            </div>
 
           {spendCategories.length === 0 ? (
             <div className="clay p-4 flex flex-col items-center gap-3 text-center rounded-[14px]">
@@ -389,8 +454,56 @@ export default function SettingsPanel({ onClose, onChange }: Props) {
               </button>
             )}
           </div>
+          </Collapsible>
+
+          <div className="clay p-3 flex flex-col gap-2">
+            <p className="text-xs font-black text-rose-400 uppercase tracking-wide">Danger zone</p>
+            <p className="text-xs font-semibold text-stone-500 leading-relaxed">
+              Wipe every entry, transfer, recurring rule and split group. Wallets, types and spending categories stay. This cannot be undone.
+            </p>
+            {resetMsg && <p className="text-xs font-bold text-emerald-700">{resetMsg}</p>}
+            <button
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              className="clay-btn py-3 bg-rose-500 text-white font-black rounded-[12px] min-h-[48px]">
+              🗑️ Full reset
+            </button>
+          </div>
         </div>
       </div>
+
+      {confirmReset && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+          style={{ background: 'var(--overlay-bg)' }}
+          onClick={() => !resetting && setConfirmReset(false)}>
+          <div
+            className="clay animate-pop-in w-full max-w-sm p-5 flex flex-col gap-3"
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-stone-800 text-center">Reset everything?</h3>
+            <p className="text-sm font-semibold text-stone-500 text-center leading-relaxed">
+              All entries, transfers, recurring rules and split groups will be deleted from this device and the cloud. Wallets, types and spending categories stay.
+            </p>
+            <p className="text-xs font-black text-rose-500 text-center">This cannot be undone.</p>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                disabled={resetting}
+                onClick={() => setConfirmReset(false)}
+                className="clay clay-btn flex-1 py-3.5 font-bold text-stone-500 min-h-[48px]">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={resetting}
+                onClick={() => { void handleReset(); }}
+                className="clay-btn flex-1 py-3.5 rounded-[16px] font-black text-white bg-rose-500 min-h-[48px] disabled:opacity-50">
+                {resetting ? 'Resetting…' : 'Yes, reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

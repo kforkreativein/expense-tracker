@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
 import { getTransactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
 import { getSplitGroups, groupNetTotal, adjustForSettledSplits } from '@/lib/splits';
@@ -14,6 +14,8 @@ import { filterTransactionsForView, ViewMode } from '@/lib/view';
 import { registerServiceWorker, notificationsEnabled, showNotification } from '@/lib/notifications';
 import { applyTheme, getTheme } from '@/lib/theme';
 import { isVoiceConfigured } from '@/lib/voice/client';
+import { isSupabaseEnabled } from '@/lib/supabase/client';
+import { isRecordingSupported } from '@/lib/voice/recorder';
 import { VoiceResult } from '@/lib/voice/types';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
@@ -54,10 +56,12 @@ export default function Home() {
   const [splitGroupId, setSplitGroupId] = useState<string | undefined>(undefined);
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
   const [splitEnabled, setSplitEnabled] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceAutoStart, setVoiceAutoStart] = useState(false);
   const [voiceResult, setVoiceResult] = useState<{ id: number; data: VoiceResult } | null>(null);
   const voiceSeq = useRef(0);
+  // Mic support is a browser-only fact; the server snapshot must stay false
+  const canRecord = useSyncExternalStore(() => () => {}, isRecordingSupported, () => false);
+  const voiceEnabled = !!authenticated && isSupabaseEnabled() && canRecord;
 
   const refresh = useCallback(() => setTransactions(getTransactions()), []);
   const reloadSplits = useCallback(() => {
@@ -135,15 +139,10 @@ export default function Home() {
     if (authenticated) loadAppData();
   }, [authenticated, loadAppData]);
 
-  // Hide the microphone entirely unless the server can actually serve it
+  // Warm the voice config cache so the first press already knows if the key is live
   useEffect(() => {
-    if (!authenticated) return;
-    let active = true;
-    isVoiceConfigured().then(ok => {
-      if (active) setVoiceEnabled(ok);
-    });
-    return () => { active = false; };
-  }, [authenticated]);
+    if (voiceEnabled) void isVoiceConfigured();
+  }, [voiceEnabled]);
 
   const handleAuth = useCallback(() => {
     setAuthenticated(true);
@@ -198,6 +197,24 @@ export default function Home() {
     setVoiceResult(null);
   }, [refresh]);
 
+  const handleFullReset = useCallback(() => {
+    setTransactions([]);
+    setTransfers([]);
+    setBudget(0);
+    setStreak(0);
+    setPreviousStreak(0);
+    setRecurringAdded(0);
+    setSearch('');
+    setWalletFilter(null);
+    setViewMode('all');
+    setShowForm(false);
+    setVoiceResult(null);
+    reloadSplits();
+    reloadCategories();
+    reloadTransfers();
+    refresh();
+  }, [refresh, reloadSplits, reloadCategories, reloadTransfers]);
+
   if (authenticated === null) {
     return <main className="min-h-dvh bg-[var(--app-bg)]" />;
   }
@@ -210,7 +227,9 @@ export default function Home() {
     <main className="min-h-dvh overflow-x-hidden bg-[var(--app-bg)]">
       <div
         className="max-w-md mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col gap-3"
-        style={{ paddingBottom: 'max(5rem, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
+        style={{ paddingBottom: voiceEnabled
+          ? 'max(7.5rem, calc(env(safe-area-inset-bottom) + 6rem))'
+          : 'max(5rem, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
       >
         <ProfileHeader
           streak={streak}
@@ -241,17 +260,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* 1. Add entry — by hand, or by holding the mic */}
-        <div className="flex gap-2 items-stretch">
-          <button
-            onClick={() => setShowForm(true)}
-            className="clay-btn clay-purple clay flex-1 py-4 text-base font-black text-violet-900 text-center min-h-[52px]">
-            ➕ Add Income / Expense / Invest
-          </button>
-          {voiceEnabled && (
-            <VoiceButton autoStart={voiceAutoStart} onResult={handleVoiceResult} />
-          )}
-        </div>
+        {/* 1. Add entry */}
+        <button
+          onClick={() => setShowForm(true)}
+          className="clay-btn clay-purple clay w-full py-4 text-lg font-black text-violet-900 text-center min-h-[52px]">
+          ➕ Add Income / Expense / Invest
+        </button>
 
         {/* Split group pinned cards — only pinned ones */}
         {splitEnabled && splitGroups.filter(g => !g.settled && g.pinned).map(g => {
@@ -383,7 +397,23 @@ export default function Home() {
         <SettingsPanel
           onClose={() => { setShowSettings(false); reloadSplits(); }}
           onChange={() => { reloadCategories(); reloadTransfers(); refresh(); reloadSplits(); }}
+          onReset={handleFullReset}
         />
+      )}
+
+      {/* Sticky hold-to-talk — always within thumb reach at the bottom */}
+      {voiceEnabled && !showForm && !showSettings && !showSplitTab && !voiceResult && !showOnboarding && !showStreakPopup && (
+        <div
+          className="fixed inset-x-0 z-30 flex justify-center px-4 pointer-events-none"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
+          <div className="w-full max-w-md pointer-events-auto">
+            <VoiceButton
+              variant="bar"
+              autoStart={voiceAutoStart}
+              onResult={handleVoiceResult}
+            />
+          </div>
+        </div>
       )}
 
       {showSplitTab && (

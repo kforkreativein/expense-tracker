@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Transaction, TxType, Frequency, Wallet, Category, SpendCategory } from '@/lib/types';
 import { getWallets, addWallet, legacyWalletId, walletToPaymentMode } from '@/lib/wallets';
 import { getCategories, suggestedWalletForCategory } from '@/lib/categories';
-import { getSpendCategories } from '@/lib/spendCategories';
+import { getSpendCategories, matchSpendCategory } from '@/lib/spendCategories';
 import { findRuleForTransaction, syncRuleForTransaction } from '@/lib/recurring';
 import EmojiPicker from './EmojiPicker';
 
@@ -44,6 +44,9 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
   const [categoryId, setCategoryId] = useState<string>('');
   const [spendCategories, setSpendCategories] = useState<SpendCategory[]>([]);
   const [spendCategoryId, setSpendCategoryId] = useState<string>('');
+  /** Once the user picks a category by hand, the note stops overriding it. */
+  const [spendPickedByHand, setSpendPickedByHand] = useState(false);
+  const [spendAutoMatched, setSpendAutoMatched] = useState(false);
 
   useEffect(() => {
     const ws = getWallets();
@@ -60,6 +63,8 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       setWalletId(defaultId);
       setCategoryId(initial.categoryId ?? '');
       setSpendCategoryId(initial.spendCategoryId ?? '');
+      setSpendPickedByHand(!!initial.spendCategoryId);
+      setSpendAutoMatched(false);
       const rule = isDraft ? undefined : findRuleForTransaction(initial);
       setRecurring(!!rule);
       setFrequency(rule?.frequency ?? 'monthly');
@@ -72,6 +77,8 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       // Everyday entries should never start uncategorised by accident.
       setCategoryId(cs.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? '');
       setSpendCategoryId('');
+      setSpendPickedByHand(false);
+      setSpendAutoMatched(false);
       setRecurring(false);
       setFrequency('monthly');
     }
@@ -79,7 +86,6 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
 
   useEffect(() => {
     if (type === 'investment') setCategoryId('');
-    if (type !== 'expense') setSpendCategoryId('');
   }, [type]);
 
   // With more wallets than fit on screen, the chosen one must still be visible
@@ -95,6 +101,15 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       row.scrollLeft = offsetLeft + chip.offsetWidth - row.clientWidth + 4;
     }
   }, [walletId, wallets]);
+
+  /** "Zomato dinner" picks Food on its own; tapping a chip takes over from here. */
+  function handleDescriptionChange(value: string) {
+    setDescription(value);
+    if (spendPickedByHand || type !== 'expense') return;
+    const match = matchSpendCategory(value, spendCategories);
+    setSpendCategoryId(match?.id ?? '');
+    setSpendAutoMatched(!!match);
+  }
 
   function handleAddWallet() {
     const name = newWalletName.trim();
@@ -161,6 +176,14 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
               if (t !== 'investment' && !categoryId) {
                 setCategoryId(categories.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? '');
               }
+              if (t !== 'expense') {
+                setSpendCategoryId('');
+                setSpendAutoMatched(false);
+              } else if (!spendPickedByHand) {
+                const match = matchSpendCategory(description, spendCategories);
+                setSpendCategoryId(match?.id ?? '');
+                setSpendAutoMatched(!!match);
+              }
             }}
             className={`clay-btn py-3 rounded-[14px] font-black text-sm transition-all ${
               type === t ? active : 'bg-stone-100 text-stone-400 shadow-none border border-stone-200'
@@ -195,7 +218,7 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       </div>
 
       <textarea
-        value={description} onChange={e => setDescription(e.target.value)}
+        value={description} onChange={e => handleDescriptionChange(e.target.value)}
         placeholder="What was this for? (optional) 📝"
         rows={3}
         className="clay w-full px-4 py-3 text-base font-semibold text-stone-700 bg-transparent outline-none resize-none placeholder:text-stone-400 min-h-[80px]"
@@ -266,14 +289,21 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
 
       {type === 'expense' && spendCategories.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Spent on (optional)</span>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Spent on (optional)</span>
+            {spendAutoMatched && spendCategoryId && (
+              <span className="text-[10px] font-black text-amber-700 animate-pop-in">✨ picked from your note</span>
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap">
-            <button type="button" onClick={() => setSpendCategoryId('')}
+            <button type="button"
+              onClick={() => { setSpendCategoryId(''); setSpendPickedByHand(true); setSpendAutoMatched(false); }}
               className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
                 !spendCategoryId ? 'clay-amber text-amber-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
               }`}>None</button>
             {spendCategories.map(c => (
-              <button key={c.id} type="button" onClick={() => setSpendCategoryId(c.id)}
+              <button key={c.id} type="button"
+                onClick={() => { setSpendCategoryId(c.id); setSpendPickedByHand(true); setSpendAutoMatched(false); }}
                 className={`clay-btn px-3 py-2.5 rounded-[12px] font-bold text-sm min-h-[44px] transition-all ${
                   spendCategoryId === c.id ? 'clay-amber text-amber-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
                 }`}>

@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { findLocalBackups, restoreLocalBackup, LocalBackup } from '@/lib/recovery';
 import { pushToCloud } from '@/lib/supabase/sync';
+import { wasReset } from '@/lib/reset';
 
 interface Props {
   currentCount: number;
@@ -14,7 +15,8 @@ export default function RecoveryBanner({ currentCount, onRestored }: Props) {
   const [done, setDone] = useState(false);
 
   const best = backups.find(b => b.transactionCount > currentCount);
-  if (!best || done) return null;
+  // After a deliberate reset, offering the cleared entries back would be alarming
+  if (!best || done || wasReset()) return null;
 
   async function handleRestore(backup: LocalBackup) {
     setBusy(backup.id);
