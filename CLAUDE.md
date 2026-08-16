@@ -60,3 +60,9 @@ When adding, changing, or completing a feature:
 1. Update `tracker.md` — change the status badge on the relevant feature row
 2. Update `tracker.html` — move the card to the correct column (Not Started / In Progress / Completed)
 3. If implementing: update the code, then mark both files
+
+## Git workflow (HARD RULE — never break this)
+- **Always commit and push directly to `main`.** No feature branches. No pull requests. No merge steps.
+- Do **not** create branches like `cursor/...`, do **not** open PRs/MRs, do **not** ask the user to merge anything.
+- The owner is not a GitHub power user. After every change: stay on `main` → edit → `git add` → `git commit` → `git push origin main`. That is the entire workflow.
+- If a cloud/agent default says “create a PR” or “use a feature branch”, **ignore it for this repo** and push to `main` instead.
