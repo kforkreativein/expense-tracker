@@ -95,11 +95,11 @@ export async function POST(request: Request) {
 
   const token = bearerToken(request);
   if (!token) return fail('unauthorized', 'Sign in again to import.', 401);
-  const user = await verifyAccessToken(token);
-  if (!user) return fail('unauthorized', 'Session expired. Sign in again.', 401);
+  const userId = await verifyAccessToken(token);
+  if (!userId) return fail('unauthorized', 'Session expired. Sign in again.', 401);
 
-  const limited = checkRateLimit(`import:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS);
-  if (!limited.ok) {
+  const limited = checkRateLimit(`import:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!limited.allowed) {
     return fail('rate_limited', 'Too many imports. Try again in a few minutes.', 429);
   }
 

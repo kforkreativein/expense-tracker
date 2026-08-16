@@ -54,6 +54,7 @@ export default function SubscriptionsApp({
   const [draftEmoji, setDraftEmoji] = useState('💳');
   const [draftColor, setDraftColor] = useState('#7C3AED');
   const [draftNotify, setDraftNotify] = useState(1);
+  const [draftTrial, setDraftTrial] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   function reload() {

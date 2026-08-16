@@ -8,7 +8,14 @@ import { applyDueRecurring } from '@/lib/recurring';
 import { userStorageKey, restoreAuth } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { getCategories } from '@/lib/categories';
-import { getTransfers, migrateTransfersToWallets } from '@/lib/transfers';
+import {
+  getTransfers,
+  migrateTransfersToWallets,
+  getInternalTransferTxnIds,
+  isInternalTransferTxn,
+  sumRealExpense,
+  sumRealIncome,
+} from '@/lib/transfers';
 import { recordDailyVisit, markStreakPopupSeen } from '@/lib/streak';
 import { filterTransactionsForView, ViewMode } from '@/lib/view';
 import { registerServiceWorker, notificationsEnabled, showNotification } from '@/lib/notifications';
@@ -18,7 +25,6 @@ import { isSupabaseEnabled } from '@/lib/supabase/client';
 import { isRecordingSupported } from '@/lib/voice/recorder';
 import { VoiceResult } from '@/lib/voice/types';
 import { isInMonth } from '@/lib/insights';
-import { sumRealExpense, sumRealIncome } from '@/lib/transfers';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
 import SettingsHub from '@/components/SettingsHub';
@@ -36,7 +42,7 @@ import AddCaptureMenu from '@/components/AddCaptureMenu';
 import InsightsTab from '@/components/InsightsTab';
 import FinancialTools from '@/components/FinancialTools';
 
-type TxFilter = 'all' | 'expense' | 'income';
+type TxFilter = 'all' | 'expense' | 'income' | 'transfer';
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -118,9 +124,17 @@ export default function Home() {
   }, [statsTransactions, transfers, prevMonth]);
 
   const listTransactions = useMemo(() => {
+    const transferIds = getInternalTransferTxnIds(transfers);
     let list = monthTransactions;
-    if (txFilter === 'expense') list = list.filter(t => t.type === 'expense');
-    if (txFilter === 'income') list = list.filter(t => t.type === 'income' || t.type === 'investment');
+    if (txFilter === 'transfer') {
+      list = list.filter(t => isInternalTransferTxn(t, transferIds));
+    } else if (txFilter === 'expense') {
+      list = list.filter(t => t.type === 'expense' && !isInternalTransferTxn(t, transferIds));
+    } else if (txFilter === 'income') {
+      list = list.filter(t =>
+        (t.type === 'income' || t.type === 'investment') && !isInternalTransferTxn(t, transferIds),
+      );
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(t =>
@@ -128,7 +142,7 @@ export default function Home() {
       );
     }
     return list;
-  }, [monthTransactions, txFilter, search]);
+  }, [monthTransactions, transfers, txFilter, search]);
 
   function saveBudget() {
     const val = Number(budgetDraft);
@@ -397,23 +411,26 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col gap-3 pt-2">
-                <div className="flex gap-2 rounded-full bg-black/30 p-1">
-                  {([
-                    { id: 'all' as TxFilter, label: 'ALL' },
-                    { id: 'expense' as TxFilter, label: 'EXPENSES' },
-                    { id: 'income' as TxFilter, label: 'INCOME' },
-                  ]).map(f => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setTxFilter(f.id)}
-                      className={`flex-1 rounded-full py-2.5 text-[11px] font-black tracking-wide min-h-[40px] ${
-                        txFilter === f.id ? 'bg-zinc-200 text-black' : 'text-zinc-400 border border-white/10'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                <div className="overflow-x-auto -mx-1 px-1">
+                  <div className="flex min-w-max gap-1.5 rounded-full bg-black/30 p-1">
+                    {([
+                      { id: 'all' as TxFilter, label: 'ALL' },
+                      { id: 'expense' as TxFilter, label: 'EXPENSES' },
+                      { id: 'income' as TxFilter, label: 'INCOME' },
+                      { id: 'transfer' as TxFilter, label: 'TRANSFERS' },
+                    ]).map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setTxFilter(f.id)}
+                        className={`rounded-full px-3.5 py-2.5 text-[11px] font-black tracking-wide min-h-[40px] ${
+                          txFilter === f.id ? 'bg-zinc-200 text-black' : 'text-zinc-400 border border-white/10'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <TransactionList
