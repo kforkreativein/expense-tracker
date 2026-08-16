@@ -1,5 +1,10 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Setup guides
+
+- [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — login and cloud sync across devices
+- [VOICE_SETUP.md](VOICE_SETUP.md) — speaking entries and questions (needs a Groq API key)
+
 ## Getting Started
 
 First, run the development server:

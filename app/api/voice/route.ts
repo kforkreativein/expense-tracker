@@ -81,14 +81,15 @@ export async function POST(request: Request) {
     return fail('not_configured', 'Cloud login is not configured, so voice entry cannot verify you.', 503);
   }
 
-  const userId = await verifyAccessToken(bearerToken(request));
-  if (!userId) {
-    return fail('unauthorized', 'Please log in again to use voice entry.', 401);
-  }
-
+  // Header-only, so an oversized body is turned away before anything expensive
   const declaredLength = Number(request.headers.get('content-length') ?? 0);
   if (declaredLength > MAX_AUDIO_BYTES + 64 * 1024) {
     return fail('too_large', 'That recording is too long. Please keep it under 20 seconds.', 413);
+  }
+
+  const userId = await verifyAccessToken(bearerToken(request));
+  if (!userId) {
+    return fail('unauthorized', 'Please log in again to use voice entry.', 401);
   }
 
   const limit = checkRateLimit(`voice:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);

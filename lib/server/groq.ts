@@ -206,7 +206,10 @@ export async function parseVoiceText(transcript: string, ctx: VoiceContext): Pro
       body: JSON.stringify({
         model: PARSE_MODEL,
         temperature: 0,
-        max_completion_tokens: 1200,
+        // Reasoning tokens share this budget, so leave room above the JSON itself
+        max_completion_tokens: 2500,
+        // Only the GPT-OSS family accepts this, and one short note needs no deep thinking
+        ...(PARSE_MODEL.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         response_format: responseFormat,
         messages: [
           {

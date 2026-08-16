@@ -86,7 +86,7 @@
 | 41 | Net balance / savings | ✅ Completed | Income − expense shown below stats cards, hidden by default with eye toggle |
 | 44 | User login (username + password) | ✅ Completed | Sign up / sign in screen, per-user isolated data, session remembered on this device |
 | 45 | Investment tracking | ✅ Completed | Third type alongside income/expense, own stats column, excluded from expense budget & net income |
-| 46 | Custom expense categories | ✅ Completed | Optional categories in Settings, per-category budgets, filter view & tags on income/expense; Personal is preselected for new entries |
+| 46 | Custom types (was "categories") | ✅ Completed | Optional buckets in Settings, per-type budgets, filter view & tags on income/expense; Personal is preselected for new entries. Renamed to "Type" in feature 68 — spending categories are now a separate list |
 | 47 | Savings goal | ✅ Completed | Target tracked via total investments, editable compact goal card |
 | 48 | Due reminders | ✅ Completed | Upcoming recurring rules due within 7 days |
 | 49 | Weekly summary | ✅ Completed | This week income, expense, investment, net |
@@ -114,3 +114,6 @@
 | 28 | Emoji rain for big expenses | ⬜ Removed | Negative celebration removed |
 | 29 | Motivation banner toast | ⬜ Removed | Negative celebration removed |
 | 43 | Dark mode | ✅ Completed | Light default with a saved manual switch; all app surfaces use a charcoal clay theme in dark mode |
+| 68 | Spending categories, separate from Type | ✅ Completed | Food / Transport / Shopping etc. with their own monthly limit and chip on each expense. The old categories (Personal, Business, Savings) are now labelled "Type" since they drive the 👁️ View bar. Managed in Settings; own Supabase table |
+| 69 | Voice entry (hold to talk) | ✅ Completed | Hold the 🎤 next to Add, or double-tap for hands-free. Groq Whisper transcribes English + Hindi, a Groq model fills the fields, and the normal form opens pre-filled to confirm. Several amounts in one sentence become stacked editable cards with one Save all |
+| 70 | Voice questions | ✅ Completed | Ask "how much did I spend on food this month" and get the total, with the biggest entries and the category limit. Computed on the device, so no amounts are ever sent out |
