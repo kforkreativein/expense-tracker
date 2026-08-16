@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RecorderError, VoiceRecorder, isRecordingSupported, recorderMessage } from '@/lib/voice/recorder';
 import { VoiceRequestError, transcribeVoice } from '@/lib/voice/client';
 import { VoiceResult } from '@/lib/voice/types';
@@ -34,9 +34,12 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/** Recording support is a browser-only fact; the server snapshot must be false. */
+const subscribeNever = () => () => {};
+const serverSnapshot = () => false;
+
 export default function VoiceButton({ onResult, autoStart = false }: Props) {
-  // Only mounted once the server confirms voice is available, so this never runs on the server
-  const [supported] = useState(() => isRecordingSupported());
+  const supported = useSyncExternalStore(subscribeNever, isRecordingSupported, serverSnapshot);
   const [phase, setPhase] = useState<Phase>('idle');
   const [mode, setMode] = useState<Mode>('hold');
   const [elapsed, setElapsed] = useState(0);

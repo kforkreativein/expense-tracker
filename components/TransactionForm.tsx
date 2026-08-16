@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Transaction, TxType, Frequency, Wallet, Category, SpendCategory } from '@/lib/types';
 import { getWallets, addWallet, legacyWalletId, walletToPaymentMode } from '@/lib/wallets';
 import { getCategories, suggestedWalletForCategory } from '@/lib/categories';
@@ -33,6 +33,7 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
 
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [walletId, setWalletId] = useState<string>('');
+  const walletRowRef = useRef<HTMLDivElement>(null);
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletEmoji, setNewWalletEmoji] = useState('💳');
@@ -80,6 +81,20 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
     if (type === 'investment') setCategoryId('');
     if (type !== 'expense') setSpendCategoryId('');
   }, [type]);
+
+  // With more wallets than fit on screen, the chosen one must still be visible
+  useEffect(() => {
+    const row = walletRowRef.current;
+    if (!row || !walletId) return;
+    const chip = row.querySelector<HTMLElement>(`[data-wallet-id="${CSS.escape(walletId)}"]`);
+    if (!chip) return;
+    const offsetLeft = chip.offsetLeft - row.offsetLeft;
+    if (offsetLeft < row.scrollLeft) {
+      row.scrollLeft = Math.max(0, offsetLeft - 4);
+    } else if (offsetLeft + chip.offsetWidth > row.scrollLeft + row.clientWidth) {
+      row.scrollLeft = offsetLeft + chip.offsetWidth - row.clientWidth + 4;
+    }
+  }, [walletId, wallets]);
 
   function handleAddWallet() {
     const name = newWalletName.trim();
@@ -188,11 +203,12 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
 
       <div className="flex flex-col gap-2">
         <span className="text-xs font-black text-stone-400 uppercase tracking-wider">Wallet</span>
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <div ref={walletRowRef} className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           {wallets.map(w => (
             <button key={w.id} type="button"
+              data-wallet-id={w.id}
               onClick={() => setWalletId(w.id)}
-              className={`clay-btn flex-shrink-0 snap-start flex items-center gap-1.5 px-3 py-2.5 rounded-[12px] font-bold text-sm transition-all min-h-[44px] ${
+              className={`clay-btn flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-[12px] font-bold text-sm transition-all min-h-[44px] ${
                 walletId === w.id ? 'clay-blue text-blue-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
               }`}>
               <span>{w.emoji}</span>
