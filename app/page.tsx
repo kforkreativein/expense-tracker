@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
-import { getTransactions, addTransaction, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
+import { getTransactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
 import { getSplitGroups, groupNetTotal, adjustForSettledSplits } from '@/lib/splits';
 import { getSplitEnabled } from '@/lib/settings';
 import { applyDueRecurring } from '@/lib/recurring';
@@ -13,6 +13,8 @@ import { recordDailyVisit } from '@/lib/streak';
 import { filterTransactionsForView, ViewMode } from '@/lib/view';
 import { registerServiceWorker, notificationsEnabled, showNotification } from '@/lib/notifications';
 import { applyTheme, getTheme } from '@/lib/theme';
+import { isVoiceConfigured } from '@/lib/voice/client';
+import { VoiceResult } from '@/lib/voice/types';
 import Onboarding from '@/components/Onboarding';
 import AuthScreen from '@/components/AuthScreen';
 import ProfileHeader from '@/components/ProfileHeader';
@@ -28,6 +30,8 @@ import CreditCardReminders from '@/components/CreditCardReminders';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import MoreSection from '@/components/MoreSection';
 import SplitTab from '@/components/SplitTab';
+import VoiceButton from '@/components/VoiceButton';
+import VoiceConfirmSheet from '@/components/VoiceConfirmSheet';
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -50,6 +54,10 @@ export default function Home() {
   const [splitGroupId, setSplitGroupId] = useState<string | undefined>(undefined);
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
   const [splitEnabled, setSplitEnabled] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceAutoStart, setVoiceAutoStart] = useState(false);
+  const [voiceResult, setVoiceResult] = useState<{ id: number; data: VoiceResult } | null>(null);
+  const voiceSeq = useRef(0);
 
   const refresh = useCallback(() => setTransactions(getTransactions()), []);
   const reloadSplits = useCallback(() => {
@@ -103,9 +111,15 @@ export default function Home() {
     }
     if (!localStorage.getItem(userStorageKey('onboarding_done'))) {
       setShowOnboarding(true);
-    } else if (new URLSearchParams(window.location.search).get('action') === 'add') {
-      setShowForm(true);
-      window.history.replaceState({}, '', '/');
+    } else {
+      const action = new URLSearchParams(window.location.search).get('action');
+      if (action === 'add') {
+        setShowForm(true);
+        window.history.replaceState({}, '', '/');
+      } else if (action === 'voice') {
+        setVoiceAutoStart(true);
+        window.history.replaceState({}, '', '/');
+      }
     }
   }, [refresh, reloadCategories, reloadTransfers, reloadSplits]);
 
@@ -120,6 +134,16 @@ export default function Home() {
   useEffect(() => {
     if (authenticated) loadAppData();
   }, [authenticated, loadAppData]);
+
+  // Hide the microphone entirely unless the server can actually serve it
+  useEffect(() => {
+    if (!authenticated) return;
+    let active = true;
+    isVoiceConfigured().then(ok => {
+      if (active) setVoiceEnabled(ok);
+    });
+    return () => { active = false; };
+  }, [authenticated]);
 
   const handleAuth = useCallback(() => {
     setAuthenticated(true);
@@ -161,6 +185,17 @@ export default function Home() {
   const handleDelete = useCallback((id: string) => {
     deleteTransaction(id);
     refresh();
+  }, [refresh]);
+
+  const handleVoiceResult = useCallback((data: VoiceResult) => {
+    voiceSeq.current += 1;
+    setVoiceResult({ id: voiceSeq.current, data });
+  }, []);
+
+  const handleVoiceSave = useCallback((txns: Transaction[]) => {
+    addTransactions(txns);
+    refresh();
+    setVoiceResult(null);
   }, [refresh]);
 
   if (authenticated === null) {
@@ -206,12 +241,17 @@ export default function Home() {
           </div>
         )}
 
-        {/* 1. Add entry */}
-        <button
-          onClick={() => setShowForm(true)}
-          className="clay-btn clay-purple clay w-full py-4 text-lg font-black text-violet-900 text-center min-h-[52px]">
-          ➕ Add Income / Expense / Invest
-        </button>
+        {/* 1. Add entry — by hand, or by holding the mic */}
+        <div className="flex gap-2 items-stretch">
+          <button
+            onClick={() => setShowForm(true)}
+            className="clay-btn clay-purple clay flex-1 py-4 text-base font-black text-violet-900 text-center min-h-[52px]">
+            ➕ Add Income / Expense / Invest
+          </button>
+          {voiceEnabled && (
+            <VoiceButton autoStart={voiceAutoStart} onResult={handleVoiceResult} />
+          )}
+        </div>
 
         {/* Split group pinned cards — only pinned ones */}
         {splitEnabled && splitGroups.filter(g => !g.settled && g.pinned).map(g => {
@@ -313,6 +353,15 @@ export default function Home() {
             />
           </div>
         </div>
+      )}
+
+      {voiceResult && (
+        <VoiceConfirmSheet
+          key={voiceResult.id}
+          result={voiceResult.data}
+          onSaveAll={handleVoiceSave}
+          onClose={() => setVoiceResult(null)}
+        />
       )}
 
       {showStreakPopup && (
