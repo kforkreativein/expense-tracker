@@ -58,8 +58,15 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
   const phaseRef = useRef<Phase>('idle');
   const modeRef = useRef<Mode>('hold');
 
-  useEffect(() => { phaseRef.current = phase; }, [phase]);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
+  /**
+   * Pointer handlers read the phase straight from the ref. Releasing the button
+   * can land in the same tick as a phase change, so the ref has to move with the
+   * state rather than a render behind it.
+   */
+  const goTo = useCallback((next: Phase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
 
   const clearTimers = useCallback(() => {
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
@@ -80,38 +87,36 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
 
   const send = useCallback(async () => {
     const recorder = recorderRef.current;
+    // Releasing the button and the 20s timer can both land here; whoever takes
+    // the recorder owns the upload, and the loser must not reset the UI under it
+    if (!recorder) return;
     recorderRef.current = null;
     clearTimers();
-    if (!recorder) {
-      setPhase('idle');
-      resetVisuals();
-      return;
-    }
 
     const captured = await recorder.stop();
     resetVisuals();
 
     if (!captured || captured.durationMs < MIN_RECORDING_MS) {
-      setPhase('idle');
+      goTo('idle');
       showHint('Too short — hold the mic while you speak.');
       return;
     }
 
-    setPhase('sending');
+    goTo('sending');
     buzz(12);
     try {
       const result = await transcribeVoice(captured.blob, captured.mimeType);
-      setPhase('idle');
+      goTo('idle');
       onResult(result);
     } catch (err) {
-      setPhase('idle');
+      goTo('idle');
       setError(
         err instanceof VoiceRequestError
           ? err.message
           : 'Voice entry failed. Please try again.',
       );
     }
-  }, [clearTimers, onResult, resetVisuals, showHint]);
+  }, [clearTimers, goTo, onResult, resetVisuals, showHint]);
 
   const begin = useCallback(async (nextMode: Mode) => {
     if (phaseRef.current !== 'idle') return;
@@ -119,13 +124,13 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
     setHint('');
     setMode(nextMode);
     modeRef.current = nextMode;
-    setPhase('starting');
+    goTo('starting');
 
     const recorder = new VoiceRecorder();
     try {
       await recorder.start();
     } catch (err) {
-      setPhase('idle');
+      goTo('idle');
       setError(err instanceof RecorderError ? err.message : recorderMessage('failed'));
       return;
     }
@@ -133,13 +138,13 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
     // Released while the browser was still opening the mic
     if (!wantedRef.current && nextMode === 'hold') {
       recorder.cancel();
-      setPhase('idle');
+      goTo('idle');
       showHint('Hold the mic a little longer while you speak.');
       return;
     }
 
     recorderRef.current = recorder;
-    setPhase('recording');
+    goTo('recording');
     buzz(18);
 
     meterRef.current = setInterval(() => {
@@ -154,16 +159,16 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
       showHint('20 second limit reached.');
       void send();
     }, MAX_RECORDING_MS);
-  }, [send, showHint]);
+  }, [goTo, send, showHint]);
 
   const cancel = useCallback(() => {
     wantedRef.current = false;
     clearTimers();
     recorderRef.current?.cancel();
     recorderRef.current = null;
-    setPhase('idle');
+    goTo('idle');
     resetVisuals();
-  }, [clearTimers, resetVisuals]);
+  }, [clearTimers, goTo, resetVisuals]);
 
   useEffect(() => {
     if (!autoStart || !supported) return;
@@ -181,12 +186,12 @@ export default function VoiceButton({ onResult, autoStart = false }: Props) {
   }, [clearTimers]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    if (phase === 'sending' || phase === 'starting') return;
+    if (phaseRef.current === 'sending' || phaseRef.current === 'starting') return;
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
 
     // A tap while hands-free is running means "stop" — handled on release
-    if (phase === 'recording') return;
+    if (phaseRef.current === 'recording') return;
 
     wantedRef.current = true;
     holdTimerRef.current = setTimeout(() => {
