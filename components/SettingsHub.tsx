@@ -9,7 +9,6 @@ import { fmt, isCurrentMonth } from '@/lib/insights';
 import { sumRealExpense } from '@/lib/transfers';
 import { getTransfers } from '@/lib/transfers';
 import {
-  canUseNotifications,
   enableNotifications,
   notificationsEnabled,
 } from '@/lib/notifications';
