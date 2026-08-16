@@ -2,18 +2,18 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
 import { getTransactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
-import { getSplitGroups, groupNetTotal, adjustForSettledSplits } from '@/lib/splits';
-import { getSplitEnabled } from '@/lib/settings';
+import { getSplitGroups, adjustForSettledSplits } from '@/lib/splits';
+import { getSplitEnabled, setSplitEnabled } from '@/lib/settings';
 import { applyDueRecurring } from '@/lib/recurring';
 import { userStorageKey, restoreAuth } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { getCategories } from '@/lib/categories';
 import { getTransfers, migrateTransfersToWallets } from '@/lib/transfers';
-import { recordDailyVisit } from '@/lib/streak';
+import { recordDailyVisit, markStreakPopupSeen } from '@/lib/streak';
 import { filterTransactionsForView, ViewMode } from '@/lib/view';
 import { registerServiceWorker, notificationsEnabled, showNotification } from '@/lib/notifications';
 import { applyTheme, getTheme } from '@/lib/theme';
-import { isVoiceConfigured } from '@/lib/voice/client';
+import { isVoiceConfigured, importStatementFile, VoiceRequestError } from '@/lib/voice/client';
 import { isSupabaseEnabled } from '@/lib/supabase/client';
 import { isRecordingSupported } from '@/lib/voice/recorder';
 import { VoiceResult } from '@/lib/voice/types';
@@ -24,20 +24,20 @@ import AuthScreen from '@/components/AuthScreen';
 import ProfileHeader from '@/components/ProfileHeader';
 import SettingsPanel from '@/components/SettingsPanel';
 import StreakPopup from '@/components/StreakPopup';
-import EntrySearch from '@/components/EntrySearch';
-import ViewModeBar from '@/components/ViewModeBar';
 import TransactionForm from '@/components/TransactionForm';
 import TransactionList from '@/components/TransactionList';
-import LowBalanceAlert from '@/components/LowBalanceAlert';
-import CreditCardReminders from '@/components/CreditCardReminders';
 import RecoveryBanner from '@/components/RecoveryBanner';
-import MoreSection from '@/components/MoreSection';
 import SplitTab from '@/components/SplitTab';
 import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirmSheet from '@/components/VoiceConfirmSheet';
 import BottomDock, { AppTab } from '@/components/BottomDock';
-import SiriHoldTop from '@/components/SiriHoldTop';
+import SiriVoiceOrb from '@/components/SiriVoiceOrb';
 import HomeDashboard from '@/components/HomeDashboard';
+import AddCaptureMenu from '@/components/AddCaptureMenu';
+import InsightsTab from '@/components/InsightsTab';
+import FinancialTools from '@/components/FinancialTools';
+
+type TxFilter = 'all' | 'expense' | 'income';
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -55,24 +55,27 @@ export default function Home() {
   const [recurringRefresh, setRecurringRefresh] = useState(0);
   const [recurringAdded, setRecurringAdded] = useState(0);
   const [search, setSearch] = useState('');
-  const [showSplitTab, setShowSplitTab] = useState(false);
   const [splitGroupId, setSplitGroupId] = useState<string | undefined>(undefined);
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
-  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitEnabled, setSplitEnabledState] = useState(false);
   const [voiceAutoStart, setVoiceAutoStart] = useState(false);
+  const [showVoiceBar, setShowVoiceBar] = useState(false);
   const [voiceResult, setVoiceResult] = useState<{ id: number; data: VoiceResult } | null>(null);
   const voiceSeq = useRef(0);
-  // Mic support is a browser-only fact; the server snapshot must stay false
   const canRecord = useSyncExternalStore(() => () => {}, isRecordingSupported, () => false);
   const voiceEnabled = !!authenticated && isSupabaseEnabled() && canRecord;
   const [tab, setTab] = useState<AppTab>('home');
   const [monthCursor, setMonthCursor] = useState(() => new Date());
   const [showBudget, setShowBudget] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState('');
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [txFilter, setTxFilter] = useState<TxFilter>('all');
+  const [importError, setImportError] = useState('');
 
   const refresh = useCallback(() => setTransactions(getTransactions()), []);
   const reloadSplits = useCallback(() => {
-    setSplitEnabled(getSplitEnabled());
+    setSplitEnabledState(getSplitEnabled());
     setSplitGroups(getSplitGroups());
   }, []);
   const reloadCategories = useCallback(() => setCategories(getCategories()), []);
@@ -88,11 +91,8 @@ export default function Home() {
     [transactions, viewMode],
   );
 
-  // Stats view: settled split groups count as one net "my share" expense
-  // (wallet balances & the entry list keep the real money movements)
   const statsTransactions = useMemo(
     () => adjustForSettledSplits(viewTransactions),
-    // splitGroups in deps so stats refresh when a group gets settled
     [viewTransactions, splitGroups],
   );
 
@@ -108,9 +108,26 @@ export default function Home() {
   );
   const monthExpense = useMemo(() => sumRealExpense(monthTransactions, monthTransfers), [monthTransactions, monthTransfers]);
   const monthIncome = useMemo(() => sumRealIncome(monthTransactions, monthTransfers), [monthTransactions, monthTransfers]);
-  const activeCategory = categoryFilter && categoryFilter !== '__none'
-    ? categories.find(c => c.id === categoryFilter)
-    : null;
+
+  const prevMonth = useMemo(() => new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1), [monthCursor]);
+  const prevMonthExpense = useMemo(() => {
+    const tx = statsTransactions.filter(t => isInMonth(t.date, prevMonth.getFullYear(), prevMonth.getMonth()));
+    const tr = transfers.filter(t => isInMonth(t.date, prevMonth.getFullYear(), prevMonth.getMonth()));
+    return sumRealExpense(tx, tr);
+  }, [statsTransactions, transfers, prevMonth]);
+
+  const listTransactions = useMemo(() => {
+    let list = monthTransactions;
+    if (txFilter === 'expense') list = list.filter(t => t.type === 'expense');
+    if (txFilter === 'income') list = list.filter(t => t.type === 'income' || t.type === 'investment');
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(t =>
+        t.description.toLowerCase().includes(q) || String(t.amount).includes(q),
+      );
+    }
+    return list;
+  }, [monthTransactions, txFilter, search]);
 
   function saveBudget() {
     const val = Number(budgetDraft);
@@ -148,9 +165,10 @@ export default function Home() {
     } else {
       const action = new URLSearchParams(window.location.search).get('action');
       if (action === 'add') {
-        setShowForm(true);
+        setShowAddMenu(true);
         window.history.replaceState({}, '', '/');
       } else if (action === 'voice') {
+        setShowVoiceBar(true);
         setVoiceAutoStart(true);
         window.history.replaceState({}, '', '/');
       }
@@ -169,10 +187,16 @@ export default function Home() {
     if (authenticated) loadAppData();
   }, [authenticated, loadAppData]);
 
-  // Warm the voice config cache so the first press already knows if the key is live
   useEffect(() => {
     if (voiceEnabled) void isVoiceConfigured();
   }, [voiceEnabled]);
+
+  useEffect(() => {
+    if (tab === 'split' && !getSplitEnabled()) {
+      setSplitEnabled(true);
+      setSplitEnabledState(true);
+    }
+  }, [tab]);
 
   const handleAuth = useCallback(() => {
     setAuthenticated(true);
@@ -218,6 +242,8 @@ export default function Home() {
   const handleVoiceResult = useCallback((data: VoiceResult) => {
     voiceSeq.current += 1;
     setVoiceResult({ id: voiceSeq.current, data });
+    setShowVoiceBar(false);
+    setVoiceAutoStart(false);
   }, []);
 
   const handleVoiceSave = useCallback((txns: Transaction[]) => {
@@ -225,6 +251,18 @@ export default function Home() {
     refresh();
     setVoiceResult(null);
   }, [refresh]);
+
+  const handleImportFile = useCallback(async (file: File) => {
+    setImportError('');
+    setShowAddMenu(false);
+    try {
+      const data = await importStatementFile(file);
+      voiceSeq.current += 1;
+      setVoiceResult({ id: voiceSeq.current, data });
+    } catch (err) {
+      setImportError(err instanceof VoiceRequestError ? err.message : 'Import failed.');
+    }
+  }, []);
 
   const handleFullReset = useCallback(() => {
     setTransactions([]);
@@ -244,6 +282,12 @@ export default function Home() {
     refresh();
   }, [refresh, reloadSplits, reloadCategories, reloadTransfers]);
 
+  const handleTab = useCallback((next: AppTab) => {
+    setTab(next);
+    setSheetExpanded(false);
+    if (next === 'split') setSplitGroupId(undefined);
+  }, []);
+
   if (authenticated === null) {
     return <main className="min-h-dvh bg-[var(--app-bg)]" />;
   }
@@ -251,22 +295,6 @@ export default function Home() {
   if (!authenticated) {
     return <AuthScreen onAuth={handleAuth} />;
   }
-
-  const moreProps = {
-    transactions,
-    viewTransactions,
-    transfers,
-    categories,
-    viewMode,
-    walletFilter,
-    onWalletFilter: (id: string) => setWalletFilter(prev => prev === id ? null : id),
-    budget,
-    onSetBudget: setBudget,
-    onRefresh: refresh,
-    recurringRefresh,
-    onTransfer: () => { reloadTransfers(); reloadCategories(); refresh(); },
-    onTransferUndo: () => { reloadTransfers(); refresh(); },
-  };
 
   return (
     <main className="min-h-dvh overflow-x-hidden bg-[var(--app-bg)]">
@@ -297,39 +325,29 @@ export default function Home() {
           </div>
         )}
 
+        {importError && (
+          <div className="rounded-[14px] border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300 flex justify-between gap-2">
+            <span>{importError}</span>
+            <button type="button" onClick={() => setImportError('')}>✕</button>
+          </div>
+        )}
+
         {tab === 'home' && (
           <>
-            <HomeDashboard
-              expense={monthExpense}
-              income={monthIncome}
-              budget={budget}
-              month={monthCursor}
-              onMonthChange={delta => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))}
-              onSetBudget={() => { setBudgetDraft(budget > 0 ? String(budget) : ''); setShowBudget(true); }}
-              activeCategory={activeCategory}
-              incomeNotSet={monthIncome === 0}
-            />
+            {!sheetExpanded && (
+              <HomeDashboard
+                expense={monthExpense}
+                income={monthIncome}
+                budget={budget}
+                month={monthCursor}
+                onMonthSelect={(y, m) => setMonthCursor(new Date(y, m, 1))}
+                onSetBudget={() => { setBudgetDraft(budget > 0 ? String(budget) : ''); setShowBudget(true); }}
+                expenses={monthTransactions}
+                prevMonthExpense={prevMonthExpense}
+              />
+            )}
 
-            {splitEnabled && splitGroups.filter(g => !g.settled && g.pinned).map(g => {
-              const net = groupNetTotal(g);
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => { setSplitGroupId(g.id); setShowSplitTab(true); }}
-                  className="clay-btn clay w-full px-4 py-3 flex items-center justify-between min-h-[48px]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span>✂️</span>
-                    <span className="font-black text-stone-800 truncate">{g.name}</span>
-                  </div>
-                  <span className={`text-xs font-black shrink-0 ml-2 ${net === 0 ? 'text-stone-400' : net > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {net === 0 ? 'All even' : net > 0 ? `+₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `-₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                  </span>
-                </button>
-              );
-            })}
-
-            {showBudget && (
+            {showBudget && !sheetExpanded && (
               <div className="clay animate-pop-in grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 p-3 items-center min-w-0">
                 <span className="text-stone-500 font-black text-sm">₹</span>
                 <input
@@ -349,23 +367,46 @@ export default function Home() {
               </div>
             )}
 
-            <div className="sheet-card -mx-4 mt-1 min-h-[46vh] px-4 pb-4 pt-2">
-              <SiriHoldTop />
+            <div className={`sheet-card -mx-4 mt-1 min-h-[42vh] px-4 pb-4 pt-2 ${sheetExpanded ? 'is-expanded' : ''}`}>
+              <div className="flex flex-col items-center gap-1">
+                <button
+                  type="button"
+                  aria-label={sheetExpanded ? 'Collapse transactions' : 'Expand transactions'}
+                  onClick={() => setSheetExpanded(v => !v)}
+                  className="flex w-full flex-col items-center py-1"
+                >
+                  <span className="mb-1 h-1 w-10 rounded-full bg-zinc-600" />
+                </button>
+                {voiceEnabled && (
+                  <SiriVoiceOrb
+                    active={showVoiceBar}
+                    onActivate={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
+                  />
+                )}
+              </div>
+
               <div className="flex flex-col gap-3 pt-2">
-                <EntrySearch value={search} onChange={v => setSearch(v)} />
-                {categories.length > 0 && (
-                  <ViewModeBar categories={categories} viewMode={viewMode} onSelect={setViewMode} />
-                )}
-                {splitEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => { setSplitGroupId(undefined); setShowSplitTab(true); }}
-                    className="clay-btn clay w-full py-3 font-bold text-stone-600 text-center text-sm min-h-[44px]">
-                    ✂️ Split Groups
-                  </button>
-                )}
+                <div className="flex gap-2 rounded-full bg-black/30 p-1">
+                  {([
+                    { id: 'all' as TxFilter, label: 'ALL' },
+                    { id: 'expense' as TxFilter, label: 'EXPENSES' },
+                    { id: 'income' as TxFilter, label: 'INCOME' },
+                  ]).map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setTxFilter(f.id)}
+                      className={`flex-1 rounded-full py-2.5 text-[11px] font-black tracking-wide min-h-[40px] ${
+                        txFilter === f.id ? 'bg-zinc-200 text-black' : 'text-zinc-400 border border-white/10'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
                 <TransactionList
-                  transactions={viewTransactions}
+                  transactions={listTransactions}
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
                   walletFilter={walletFilter}
@@ -374,29 +415,50 @@ export default function Home() {
                   search={search}
                   onSearchChange={setSearch}
                   hideSearchBar
-                  onOpenSplitGroup={id => { setSplitGroupId(id); setShowSplitTab(true); }}
+                  onOpenSplitGroup={id => { setSplitGroupId(id); setTab('split'); }}
                 />
-                <LowBalanceAlert transactions={transactions} />
-                <CreditCardReminders transactions={transactions} />
               </div>
             </div>
           </>
         )}
 
         {tab === 'insights' && (
-          <div className="flex flex-col gap-4">
-            <h1 className="text-[28px] font-black text-white">Insights</h1>
-            {transactions.length === 0 ? (
-              <p className="rounded-[16px] border border-white/10 px-4 py-3 text-center text-sm font-semibold text-zinc-400">
-                Add transactions to get AI insights
-              </p>
-            ) : (
-              <MoreSection {...moreProps} pane="insights" />
-            )}
-          </div>
+          <InsightsTab
+            transactions={viewTransactions}
+            monthTransactions={monthTransactions}
+            transfers={transfers}
+            categories={categories}
+            budget={budget}
+            income={monthIncome}
+            year={monthCursor.getFullYear()}
+            month={monthCursor.getMonth()}
+            walletFilter={walletFilter}
+            onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
+            onRefresh={refresh}
+          />
         )}
 
-        {tab === 'tools' && <MoreSection {...moreProps} pane="tools" />}
+        {tab === 'split' && (
+          <SplitTab
+            embedded
+            onClose={() => setTab('home')}
+            onExpenseAdded={() => { refresh(); reloadSplits(); }}
+            initialGroupId={splitGroupId}
+          />
+        )}
+
+        {tab === 'tools' && (
+          <FinancialTools
+            transactions={transactions}
+            budget={budget}
+            expense={monthExpense}
+            onSetBudget={setBudget}
+            onRefresh={refresh}
+            walletFilter={walletFilter}
+            onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
+            recurringRefresh={recurringRefresh}
+          />
+        )}
 
         {tab === 'settings' && (
           <div className="flex flex-col gap-4">
@@ -415,7 +477,17 @@ export default function Home() {
         )}
       </div>
 
-      <BottomDock tab={tab} onTab={setTab} onAdd={() => setShowForm(true)} />
+      <BottomDock tab={tab} onTab={handleTab} onAdd={() => setShowAddMenu(true)} />
+
+      <AddCaptureMenu
+        open={showAddMenu}
+        onClose={() => setShowAddMenu(false)}
+        onManual={() => setShowForm(true)}
+        onVoice={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
+        onImage={handleImportFile}
+        onPdf={handleImportFile}
+        voiceAvailable={voiceEnabled}
+      />
 
       {showForm && (
         <div
@@ -447,7 +519,10 @@ export default function Home() {
         <StreakPopup
           previousStreak={previousStreak}
           streak={streak}
-          onDone={() => setShowStreakPopup(false)}
+          onDone={() => {
+            markStreakPopupSeen();
+            setShowStreakPopup(false);
+          }}
         />
       )}
 
@@ -459,10 +534,9 @@ export default function Home() {
         }} />
       )}
 
-      {/* Sticky hold-to-talk — sits just above the dock */}
-      {voiceEnabled && !showForm && tab !== 'settings' && !showSplitTab && !voiceResult && !showOnboarding && !showStreakPopup && (
+      {voiceEnabled && showVoiceBar && !showForm && !voiceResult && !showOnboarding && !showStreakPopup && (
         <div
-          className="fixed inset-x-0 z-30 flex justify-center px-4 pointer-events-none"
+          className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)' }}>
           <div className="w-full max-w-md pointer-events-auto">
             <VoiceButton
@@ -470,16 +544,15 @@ export default function Home() {
               autoStart={voiceAutoStart}
               onResult={handleVoiceResult}
             />
+            <button
+              type="button"
+              onClick={() => { setShowVoiceBar(false); setVoiceAutoStart(false); }}
+              className="mt-2 w-full text-center text-xs font-bold text-zinc-400"
+            >
+              Cancel listening
+            </button>
           </div>
         </div>
-      )}
-
-      {showSplitTab && (
-        <SplitTab
-          onClose={() => { setShowSplitTab(false); reloadSplits(); }}
-          onExpenseAdded={() => { refresh(); reloadSplits(); }}
-          initialGroupId={splitGroupId}
-        />
       )}
     </main>
   );

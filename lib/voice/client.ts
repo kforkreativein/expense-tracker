@@ -132,3 +132,41 @@ export async function transcribeVoice(blob: Blob, mimeType: string): Promise<Voi
 
   return (await res.json()) as VoiceResult;
 }
+
+/** Upload a receipt photo or statement PDF for AI parsing into draft entries. */
+export async function importStatementFile(file: File): Promise<VoiceResult> {
+  const token = await accessToken();
+  if (!token) {
+    throw new VoiceRequestError('unauthorized', 'Please log in again to import.');
+  }
+
+  const form = new FormData();
+  form.append('file', file, file.name);
+  form.append('context', JSON.stringify(buildVoiceContext()));
+
+  let res: Response;
+  try {
+    res = await fetch('/api/import', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    throw new VoiceRequestError('upstream', 'No internet connection. Import needs to be online.');
+  }
+
+  if (!res.ok) {
+    let payload: Partial<VoiceErrorResult> = {};
+    try {
+      payload = (await res.json()) as Partial<VoiceErrorResult>;
+    } catch {
+      // ignore
+    }
+    throw new VoiceRequestError(
+      payload.code ?? 'server',
+      payload.error ?? 'Import failed. Please try again.',
+    );
+  }
+
+  return (await res.json()) as VoiceResult;
+}

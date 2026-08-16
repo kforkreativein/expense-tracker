@@ -264,13 +264,11 @@ export async function pullFromCloud(): Promise<boolean> {
   }
 
   if (setRes.data?.streak_count != null || setRes.data?.last_visit_date) {
-    localStorage.setItem(
-      userKey('money_buddy_streak', userId),
-      JSON.stringify({
-        streak: setRes.data?.streak_count ?? 0,
-        lastVisitDate: setRes.data?.last_visit_date ?? '',
-      }),
-    );
+    const { mergeStreakFromCloud } = await import('../streak');
+    mergeStreakFromCloud({
+      streak: setRes.data?.streak_count ?? 0,
+      lastVisitDate: setRes.data?.last_visit_date ?? '',
+    });
   }
   if (setRes.data?.wallet_order) {
     try {

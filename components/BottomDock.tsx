@@ -1,6 +1,6 @@
 'use client';
 
-export type AppTab = 'home' | 'insights' | 'tools' | 'settings';
+export type AppTab = 'home' | 'insights' | 'split' | 'tools' | 'settings';
 
 interface Props {
   tab: AppTab;
@@ -51,13 +51,12 @@ export default function BottomDock({ tab, onTab, onAdd }: Props) {
             <path d="M7 14.5c.4 1.2 1.3 2.1 2.5 2.5-1.2.4-2.1 1.3-2.5 2.5-.4-1.2-1.3-2.1-2.5-2.5 1.2-.4 2.1-1.3 2.5-2.5z" />
           </svg>
         </IconWrap>
-        <IconWrap label="Add entry" onClick={onAdd}>
-          <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <circle cx="12" cy="12" r="8.5" />
-            <path d="M12 8.5v7M8.5 12h7" strokeLinecap="round" />
+        <IconWrap active={tab === 'split'} label="Split" onClick={() => onTab('split')}>
+          <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M12 5v14M7 9h10M7 15h10" strokeLinecap="round" />
           </svg>
         </IconWrap>
-        <IconWrap active={tab === 'tools'} label="Tools" onClick={() => onTab('tools')}>
+        <IconWrap active={tab === 'tools'} label="Financial tools" onClick={() => onTab('tools')}>
           <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="6" y="4" width="12" height="16" rx="2" />
             <path d="M9 8h6M9 12h6M9 16h4" strokeLinecap="round" />

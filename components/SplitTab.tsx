@@ -14,6 +14,8 @@ interface Props {
   onClose: () => void;
   onExpenseAdded: () => void;
   initialGroupId?: string;
+  /** When true, renders inline as a tab (no modal overlay). */
+  embedded?: boolean;
 }
 
 type View = 'list' | 'detail' | 'new-group' | 'new-entry' | 'settle' | 'settle-pending';
@@ -32,7 +34,7 @@ const parseSigned = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export default function SplitTab({ onClose, onExpenseAdded, initialGroupId }: Props) {
+export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embedded }: Props) {
   const [view, setView] = useState<View>(initialGroupId ? 'detail' : 'list');
   const [groups, setGroups] = useState<SplitGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialGroupId ?? null);
@@ -381,15 +383,13 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId }: Pr
     else { setShowEditMembers(false); setView('list'); }
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
+  const body = (
       <div
-        className="clay animate-slide-up w-full max-w-sm max-h-[90dvh] overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px]"
-        onClick={e => e.stopPropagation()}
-        onTouchStart={e => e.stopPropagation()}>
+        className={embedded
+          ? 'w-full flex flex-col gap-4 min-w-0'
+          : 'clay animate-slide-up w-full max-w-sm max-h-[90dvh] overflow-y-auto flex flex-col gap-4 p-5 rounded-t-[24px] sm:rounded-[24px]'}
+        onClick={embedded ? undefined : e => e.stopPropagation()}
+        onTouchStart={embedded ? undefined : e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-center gap-2">
@@ -399,16 +399,18 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId }: Pr
               ←
             </button>
           )}
-          <h2 className="text-xl font-black text-stone-800 flex-1 truncate">
-            {view === 'list' && '✂️ Split Groups'}
+          <h2 className={`font-black flex-1 truncate ${embedded ? 'text-[28px] text-white' : 'text-xl text-stone-800'}`}>
+            {view === 'list' && (embedded ? "You're owed" : '✂️ Split Groups')}
             {view === 'detail' && (selectedGroup?.name ?? 'Group')}
             {view === 'new-group' && '➕ New Group'}
             {view === 'new-entry' && '➕ Add Expense'}
             {view === 'settle' && `💸 Settle with ${settlePerson}`}
             {view === 'settle-pending' && '🧾 Pending Balances'}
           </h2>
-          <button type="button" onClick={onClose}
-            className="clay-btn w-10 h-10 rounded-[12px] text-stone-500 font-black shrink-0">✕</button>
+          {!embedded && (
+            <button type="button" onClick={onClose}
+              className="clay-btn w-10 h-10 rounded-[12px] text-stone-500 font-black shrink-0">✕</button>
+          )}
         </div>
 
         {/* ── LIST VIEW ── */}
@@ -1109,6 +1111,16 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId }: Pr
           </div>
         )}
       </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      {body}
     </div>
   );
 }

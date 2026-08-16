@@ -119,3 +119,9 @@
 | 70 | Voice questions | ✅ Completed | Ask "how much did I spend on food this month" and get the total, with the biggest entries and the category limit. Computed on the device, so no amounts are ever sent out |
 | 71 | Full reset (Settings) | ✅ Completed | Danger-zone button with a confirm modal; wipes entries, transfers, recurring and splits on device + cloud. Wallets / types / spending categories stay |
 | 72 | Auto spend-category from note | ✅ Completed | Typing "Zomato", "chai", "uber" etc. auto-selects Food / Transport / …; manual chip picks win |
+| 73 | Dark dashboard home + expandable sheet | ✅ Completed | Pie split, monthly budget bar, month picker modal, ALL/EXPENSES/INCOME filters; sheet expands full-screen |
+| 74 | Bottom dock: Home / Insights / Split / Tools / Settings | ✅ Completed | Green + FAB opens capture menu; 3rd tab is Split (±), not plus |
+| 75 | Siri orb voice + image/PDF import | ✅ Completed | Hold or double-tap orb to talk; + menu for mic, photo, PDF statement → AI draft entries |
+| 76 | AI Insights tab | ✅ Completed | Pacing / top-category cards with refresh; charts & wallets live here |
+| 77 | Financial Tools tab | ✅ Completed | Subscriptions, EMIs, wallets, FD/RD + tax + EMI calculators, CSV export |
+| 78 | Streak once-per-local-day | ✅ Completed | Uses local calendar date (not UTC); cloud merge keeps fresher visit; popup at most once/day |
