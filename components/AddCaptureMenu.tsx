@@ -5,14 +5,16 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onManual: () => void;
+  onText: () => void;
   onVoice: () => void;
   onImage: (file: File) => void;
   onPdf: (file: File) => void;
   voiceAvailable?: boolean;
+  textAvailable?: boolean;
 }
 
 export default function AddCaptureMenu({
-  open, onClose, onManual, onVoice, onImage, onPdf, voiceAvailable,
+  open, onClose, onManual, onText, onVoice, onImage, onPdf, voiceAvailable, textAvailable,
 }: Props) {
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
@@ -42,6 +44,19 @@ export default function AddCaptureMenu({
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <path d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
                   <path d="M19 11a7 7 0 01-14 0M12 18v3" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+            {(textAvailable ?? voiceAvailable) && (
+              <button
+                type="button"
+                aria-label="Type for AI"
+                onClick={() => { onClose(); onText(); }}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M4 20h16M7 16l2.2-6.5L12 4l2.8 5.5L17 16" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M9.2 12h5.6" strokeLinecap="round" />
                 </svg>
               </button>
             )}

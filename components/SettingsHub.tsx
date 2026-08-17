@@ -6,14 +6,13 @@ import { getSpendCategories, addSpendCategory, deleteSpendCategory, restoreDefau
 import { clearSpendCategoryFromTransactions, getTransactions } from '@/lib/storage';
 import { SpendCategory } from '@/lib/types';
 import { fmt, isCurrentMonth } from '@/lib/insights';
-import { sumRealExpense } from '@/lib/transfers';
-import { getTransfers } from '@/lib/transfers';
+import { sumRealExpense, getTransfers } from '@/lib/transfers';
 import {
   enableNotifications,
   notificationsEnabled,
 } from '@/lib/notifications';
 import { getTheme, setTheme, Theme } from '@/lib/theme';
-import { getCreditCardsEnabled, setCreditCardsEnabled, getSplitEnabled, setSplitEnabled } from '@/lib/settings';
+import { setCreditCardsEnabled, setSplitEnabled } from '@/lib/settings';
 import { resetAllData } from '@/lib/reset';
 import SettingsPanel from './SettingsPanel';
 
@@ -22,8 +21,24 @@ type Screen =
   | 'profile'
   | 'categories'
   | 'notifications'
+  | 'how'
+  | 'whatsnew'
+  | 'processing'
   | 'advanced'
   | 'legacy';
+
+const CURRENCIES = [
+  'INR Indian Rupee',
+  'USD US Dollar',
+  'EUR Euro',
+  'GBP British Pound',
+  'AED UAE Dirham',
+  'SGD Singapore Dollar',
+];
+
+const AGE_OPTIONS = ['', ...Array.from({ length: 83 }, (_, i) => String(i + 13))];
+
+const EMOJI_PICKS = ['🏷️', '🍔', '🛒', '🚗', '🏠', '💊', '🎬', '✈️', '👕', '📱', '🎓', '💡', '🎁', '☕', '💪', '🐕'];
 
 interface Props {
   streak: number;
@@ -35,7 +50,7 @@ interface Props {
 function Row({
   icon, label, onClick, danger, right,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   onClick?: () => void;
   danger?: boolean;
@@ -47,7 +62,7 @@ function Row({
       onClick={onClick}
       className="flex w-full items-center gap-3 px-4 py-3.5 text-left min-h-[52px] active:bg-white/5"
     >
-      <span className="text-lg w-6 text-center shrink-0" aria-hidden>{icon}</span>
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-base shrink-0" aria-hidden>{icon}</span>
       <span className={`flex-1 text-[15px] font-semibold ${danger ? 'text-rose-400' : 'text-white'}`}>{label}</span>
       {right ?? <span className="text-zinc-500">›</span>}
     </button>
@@ -78,6 +93,26 @@ function BackHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
   );
 }
 
+function Field({
+  label, children, hint,
+}: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <label className="flex flex-col gap-1.5 px-4 py-3.5">
+      <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">{label}</span>
+      {children}
+      {hint && <span className="text-[11px] text-zinc-600">{hint}</span>}
+    </label>
+  );
+}
+
+const inputClass =
+  'w-full rounded-[12px] border border-white/10 bg-black/35 px-3 py-3 text-[16px] font-semibold text-white outline-none placeholder:text-zinc-600 min-h-[48px]';
+
+function firstName(full: string) {
+  const part = full.trim().split(/\s+/)[0];
+  return part || 'Friend';
+}
+
 export default function SettingsHub({ streak, onLogout, onChange, onReset }: Props) {
   const [screen, setScreen] = useState<Screen>('home');
   const [name, setName] = useState('Friend');
@@ -86,11 +121,12 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
   const [spendCats, setSpendCats] = useState<SpendCategory[]>([]);
   const [notifOn, setNotifOn] = useState(false);
   const [theme, setThemeState] = useState<Theme>('dark');
-  const [ccOn, setCcOn] = useState(false);
-  const [splitOn, setSplitOn] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [toast, setToast] = useState('');
+  const [catName, setCatName] = useState('');
+  const [catEmoji, setCatEmoji] = useState('🏷️');
+  const [showCatForm, setShowCatForm] = useState(false);
 
   const spent = useMemo(() => {
     const tx = getTransactions().filter(t => isCurrentMonth(t.date));
@@ -111,8 +147,9 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
     setSpendCats(getSpendCategories());
     setNotifOn(notificationsEnabled());
     setThemeState(getTheme());
-    setCcOn(getCreditCardsEnabled());
-    setSplitOn(getSplitEnabled());
+    // Keep split + credit cards always available via Tools / wallets
+    setSplitEnabled(true);
+    setCreditCardsEnabled(true);
   }
 
   useEffect(() => { reload(); }, []);
@@ -123,15 +160,21 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
   }
 
   function exportCsv() {
-    const txns = getTransactions();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const txns = getTransactions().filter(t => {
+      const [yy, mm] = t.date.slice(0, 10).split('-').map(Number);
+      return yy === y && mm - 1 === m;
+    });
     const headers = ['Date', 'Type', 'Amount', 'Description'];
     const rows = txns.map(t => [t.date, t.type, t.amount, `"${(t.description ?? '').replace(/"/g, '""')}"`]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-    a.download = `money-buddy-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `money-buddy-${y}-${String(m + 1).padStart(2, '0')}.csv`;
     a.click();
-    flash('CSV downloaded');
+    flash(txns.length ? `Exported ${txns.length} rows` : 'No entries this month — empty CSV saved');
   }
 
   function backupData() {
@@ -162,7 +205,11 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
           localStorage.setItem(userStorageKey('money_buddy_txns'), JSON.stringify(data.transactions));
         }
         if (data.profile) saveProfile(data.profile);
-        flash('Backup restored — refresh if totals look stale');
+        if (Array.isArray(data.spendCategories)) {
+          const { userStorageKey } = await import('@/lib/auth');
+          localStorage.setItem(userStorageKey('money_buddy_spend_categories'), JSON.stringify(data.spendCategories));
+        }
+        flash('Backup restored');
         onChange();
         reload();
       } catch {
@@ -201,42 +248,75 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
       <div className="flex flex-col gap-4 pb-4">
         <BackHeader
           title="Edit Profile"
-          subtitle="Update your name, income, and other details so Money Buddy can tailor insights and reminders to you."
+          subtitle="Update your details so insights and reminders fit you."
           onBack={() => setScreen('home')}
         />
         <Card>
-          {[
-            { label: 'Name', value: name, set: (v: string) => { setName(v); updateDisplayName(v); } },
-            { label: 'Age', value: profile.age, set: (v: string) => setProfile(saveProfile({ age: v })) },
-            { label: 'Currency', value: profile.currency, set: (v: string) => setProfile(saveProfile({ currency: v })) },
-            { label: 'Monthly Income', value: profile.monthlyIncome, set: (v: string) => setProfile(saveProfile({ monthlyIncome: v.replace(/[^\d.]/g, '') })) },
-          ].map(row => (
-            <div key={row.label} className="flex items-center gap-3 px-4 py-3.5 min-h-[52px]">
-              <span className="text-[15px] font-semibold text-white shrink-0 w-32">{row.label}</span>
+          <Field label="Display name">
+            <input
+              value={name}
+              onChange={e => {
+                setName(e.target.value);
+                updateDisplayName(e.target.value);
+              }}
+              placeholder="Your name"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Age">
+            <select
+              value={profile.age}
+              onChange={e => setProfile(saveProfile({ age: e.target.value }))}
+              className={inputClass}
+            >
+              {AGE_OPTIONS.map(a => (
+                <option key={a || 'blank'} value={a}>{a || 'Select age'}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Currency">
+            <select
+              value={profile.currency}
+              onChange={e => setProfile(saveProfile({ currency: e.target.value }))}
+              className={inputClass}
+            >
+              {CURRENCIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Monthly income" hint="Used for pacing tips on Insights">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">₹</span>
               <input
-                value={row.value}
-                onChange={e => row.set(e.target.value)}
-                placeholder="—"
-                className="flex-1 bg-transparent text-right text-[15px] text-zinc-400 outline-none"
+                inputMode="numeric"
+                value={profile.monthlyIncome}
+                onChange={e => setProfile(saveProfile({ monthlyIncome: e.target.value.replace(/[^\d.]/g, '') }))}
+                placeholder="e.g. 80000"
+                className={`${inputClass} pl-8`}
               />
             </div>
-          ))}
+          </Field>
         </Card>
         <SectionLabel>Account</SectionLabel>
         <Card>
-          <div className="flex items-center gap-3 px-4 py-3.5 min-h-[52px]">
-            <span className="text-[15px] font-semibold text-white">Username</span>
-            <span className="flex-1 text-right text-[15px] text-zinc-400">@{username}</span>
-          </div>
-          <div className="flex items-center gap-3 px-4 py-3.5 min-h-[52px]">
-            <span className="text-[15px] font-semibold text-white shrink-0">UPI ID</span>
+          <Field label="Username" hint="Login ID — shown for reference">
+            <input
+              value={username ? `@${username}` : ''}
+              readOnly
+              className={`${inputClass} text-zinc-400`}
+            />
+          </Field>
+          <Field label="UPI ID">
             <input
               value={profile.upiId}
-              onChange={e => setProfile(saveProfile({ upiId: e.target.value }))}
+              onChange={e => setProfile(saveProfile({ upiId: e.target.value.trim() }))}
               placeholder="yourname@okhdfcbank"
-              className="flex-1 bg-transparent text-right text-[15px] text-zinc-400 outline-none"
+              className={inputClass}
+              autoCapitalize="none"
+              autoCorrect="off"
             />
-          </div>
+          </Field>
         </Card>
       </div>
     );
@@ -247,7 +327,7 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
       <div className="flex flex-col gap-4 pb-4">
         <BackHeader
           title="Edit Categories"
-          subtitle="Customize how your transactions get tagged. Rename, add, or restore defaults to match how you spend."
+          subtitle="Rename, add with an emoji, or restore defaults."
           onBack={() => setScreen('home')}
         />
         <Card>
@@ -271,19 +351,67 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
             </div>
           ))}
         </Card>
-        <button
-          type="button"
-          onClick={() => {
-            const name = prompt('Category name');
-            if (!name?.trim()) return;
-            addSpendCategory(name.trim(), '🏷️');
-            setSpendCats(getSpendCategories());
-            onChange();
-          }}
-          className="text-center text-sm font-bold text-emerald-400 py-3"
-        >
-          + Add category
-        </button>
+
+        {!showCatForm ? (
+          <button
+            type="button"
+            onClick={() => setShowCatForm(true)}
+            className="text-center text-sm font-bold text-emerald-400 py-3 min-h-[44px]"
+          >
+            + Add category
+          </button>
+        ) : (
+          <div className="rounded-[18px] border border-white/10 bg-[#1c1c1e] p-4 flex flex-col gap-3">
+            <p className="text-sm font-bold text-white">New category</p>
+            <input
+              value={catName}
+              onChange={e => setCatName(e.target.value)}
+              placeholder="Category name"
+              className={inputClass}
+              autoFocus
+            />
+            <p className="text-xs font-bold text-zinc-500">Pick an emoji</p>
+            <div className="flex flex-wrap gap-2">
+              {EMOJI_PICKS.map(e => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setCatEmoji(e)}
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl ${
+                    catEmoji === e ? 'bg-emerald-500/30 ring-2 ring-emerald-400' : 'bg-black/40'
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowCatForm(false); setCatName(''); setCatEmoji('🏷️'); }}
+                className="flex-1 rounded-full bg-zinc-800 py-3 font-bold text-zinc-300 min-h-[48px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!catName.trim()) return;
+                  addSpendCategory(catName.trim(), catEmoji);
+                  setSpendCats(getSpendCategories());
+                  setShowCatForm(false);
+                  setCatName('');
+                  setCatEmoji('🏷️');
+                  onChange();
+                }}
+                className="flex-1 rounded-full bg-emerald-500 py-3 font-black text-white min-h-[48px]"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => {
@@ -304,15 +432,15 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
     const rows: { key: keyof UserProfile['reminders']; icon: string; title: string; sub: string }[] = [
       { key: 'daily', icon: '🕐', title: 'Daily Reminder', sub: 'Every day at 9:00 PM' },
       { key: 'weekly', icon: '📊', title: 'Weekly Summary', sub: 'Every Sunday at 10:00 AM' },
-      { key: 'biMonthly', icon: '💡', title: 'Bi-Monthly Insights', sub: '1st & 15th of every month at 11:00 AM' },
-      { key: 'monthly', icon: '↻', title: 'Monthly Wrap-up', sub: '28th of every month at 7:00 PM' },
+      { key: 'biMonthly', icon: '💡', title: 'Bi-Monthly Insights', sub: '1st & 15th at 11:00 AM' },
+      { key: 'monthly', icon: '↻', title: 'Monthly Wrap-up', sub: '28th at 7:00 PM' },
       { key: 'subscription', icon: '🔔', title: 'Subscription renewals', sub: '1 day before each renewal' },
     ];
     return (
       <div className="flex flex-col gap-4 pb-4">
         <BackHeader
           title="Notifications"
-          subtitle="Pick the daily, weekly, and monthly nudges you want from Money Buddy."
+          subtitle="Pick the nudges you want from Money Buddy."
           onBack={() => setScreen('home')}
         />
         {!notifOn && (
@@ -354,7 +482,68 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
     );
   }
 
-  // HOME
+  if (screen === 'how') {
+    return (
+      <div className="flex flex-col gap-4 pb-4">
+        <BackHeader title="How Money Buddy works" onBack={() => setScreen('home')} />
+        <Card>
+          {[
+            ['➕', 'Log spends', 'Use + on the dock — voice, type for AI, photo, PDF, or manual form.'],
+            ['📊', 'Home sheet', 'Pull the handle to expand transactions. Filter All / Expenses / Income / Transfers.'],
+            ['✨', 'Insights', 'Wallets up top, then scrollable AI tips and charts.'],
+            ['✂️', 'Split', 'Shared expenses with friends — always available from the dock.'],
+            ['🛠', 'Tools', 'Budget, subscriptions, wallets, EMIs, and calculators.'],
+          ].map(([icon, title, body]) => (
+            <div key={title} className="flex gap-3 px-4 py-3.5">
+              <span className="text-lg">{icon}</span>
+              <div>
+                <p className="font-bold text-white">{title}</p>
+                <p className="text-sm text-zinc-400 leading-relaxed">{body}</p>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+    );
+  }
+
+  if (screen === 'whatsnew') {
+    return (
+      <div className="flex flex-col gap-4 pb-4">
+        <BackHeader title="What's new" onBack={() => setScreen('home')} />
+        <Card>
+          {[
+            'Dark premium home with expandable transaction sheet',
+            'Transfers filter on the home sheet',
+            'Type-to-AI quick entry from the + menu',
+            'Subscriptions hub in Financial Tools',
+            'Safer recurring rules (no duplicate auto-adds)',
+          ].map(item => (
+            <div key={item} className="px-4 py-3.5 text-[15px] font-semibold text-zinc-200 flex gap-2">
+              <span className="text-emerald-400">•</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
+    );
+  }
+
+  if (screen === 'processing') {
+    return (
+      <div className="flex flex-col gap-4 pb-4">
+        <BackHeader title="AI processing" onBack={() => setScreen('home')} />
+        <Card>
+          <div className="px-4 py-4 text-sm text-zinc-300 leading-relaxed space-y-3">
+            <p>Voice, typed notes, receipt photos, and PDF statements are parsed securely to draft entries you confirm before saving.</p>
+            <p>Nothing is saved as a final transaction until you approve the confirmation sheet.</p>
+            <p className="text-zinc-500">Requires cloud login when AI features are enabled on the server.</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-6">
       {toast && (
@@ -366,7 +555,7 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
       <div className="px-1">
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">Your account</p>
         <h1 className="mt-1 text-[32px] font-black text-white leading-tight">
-          Hey, <span className="italic text-[#f5c542]">{name}.</span>
+          Hey, <span className="italic text-[#f5c542]">{firstName(name)}.</span>
         </h1>
         <p className="mt-1 text-sm text-zinc-500">Make Money Buddy yours.</p>
         {streak > 0 && (
@@ -387,7 +576,7 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
         </div>
         <p className="mt-1 text-[17px] font-black text-[#f5c542]">Smarter money habits</p>
         <p className="mt-1 text-sm text-amber-100/70 leading-relaxed">
-          Use Insights for pacing tips, Financial Tools for subscriptions, and voice to log spends in seconds.
+          Use Insights for pacing tips, Tools for subscriptions & wallets, and + for voice or typed AI entry.
         </p>
       </div>
 
@@ -396,9 +585,6 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
         <Card>
           <Row icon="👤" label="Edit Profile" onClick={() => setScreen('profile')} />
           <Row icon="🏷️" label="Edit Categories" onClick={() => setScreen('categories')} />
-          <Row icon="💳" label="Your UPI ID" onClick={() => setScreen('profile')}
-            right={<span className="text-xs text-zinc-500 truncate max-w-[120px]">{profile.upiId || 'Set up'} ›</span>} />
-          <Row icon="🔔" label="Payment Reminders" onClick={() => setScreen('notifications')} />
           <Row icon="🔔" label="Notifications" onClick={() => setScreen('notifications')} />
         </Card>
       </div>
@@ -406,17 +592,6 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
       <div>
         <SectionLabel>Account</SectionLabel>
         <Card>
-          <Row icon="🔒" label="App Lock"
-            right={
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); flash('Use your phone’s screen lock for now'); }}
-                className="text-xs font-bold text-zinc-500"
-              >
-                Coming soon ›
-              </button>
-            }
-          />
           <Row
             icon={theme === 'dark' ? '🌙' : '☀️'}
             label="Appearance"
@@ -427,23 +602,17 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
             }}
             right={<span className="text-xs text-zinc-400 capitalize">{theme} ›</span>}
           />
-          <Row icon="✂️" label="Split groups"
-            right={
-              <button type="button" role="switch" aria-checked={splitOn}
-                onClick={e => { e.stopPropagation(); const n = !splitOn; setSplitOn(n); setSplitEnabled(n); }}
-                className={`relative h-7 w-12 rounded-full ${splitOn ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
-                <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${splitOn ? 'left-5' : 'left-0.5'}`} />
-              </button>
-            }
+          <Row
+            icon="✂️"
+            label="Split groups"
+            onClick={() => flash('Open the Split tab on the dock to manage groups')}
+            right={<span className="text-xs text-zinc-500">Always on ›</span>}
           />
-          <Row icon="💳" label="Credit card wallets"
-            right={
-              <button type="button" role="switch" aria-checked={ccOn}
-                onClick={e => { e.stopPropagation(); const n = !ccOn; setCcOn(n); setCreditCardsEnabled(n); }}
-                className={`relative h-7 w-12 rounded-full ${ccOn ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
-                <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${ccOn ? 'left-5' : 'left-0.5'}`} />
-              </button>
-            }
+          <Row
+            icon="💳"
+            label="Credit cards & wallets"
+            onClick={() => flash('Add or remove cards in Financial Tools → Wallets')}
+            right={<span className="text-xs text-zinc-500">Via Tools ›</span>}
           />
         </Card>
       </div>
@@ -451,13 +620,13 @@ export default function SettingsHub({ streak, onLogout, onChange, onReset }: Pro
       <div>
         <SectionLabel>App</SectionLabel>
         <Card>
-          <Row icon="▶️" label="How Money Buddy works" onClick={() => flash('Add spends, track budgets, split with friends')} />
-          <Row icon="⚡" label="What's new" onClick={() => flash('Dark dashboard, Split tab, Subscriptions & AI insights')} />
+          <Row icon="▶️" label="How Money Buddy works" onClick={() => setScreen('how')} />
+          <Row icon="⚡" label="What's new" onClick={() => setScreen('whatsnew')} />
           <Row icon="📊" label="Export this month (CSV)" onClick={exportCsv} />
           <Row icon="↻" label="Back up my data" onClick={backupData} />
           <Row icon="⬇️" label="Restore from a backup" onClick={restoreBackup} />
           <Row icon="⬆️" label="Share with friends" onClick={shareApp} />
-          <Row icon="✨" label="AI processing" onClick={() => flash('Voice & statement import use on-device + secure cloud AI')} />
+          <Row icon="✨" label="AI processing" onClick={() => setScreen('processing')} />
           <Row icon="🛠️" label="Advanced settings" onClick={() => setScreen('legacy')} />
           <Row icon="🚪" label="Log out" onClick={() => { logout(); onLogout(); }} />
           <Row icon="⛔" label="Delete / reset data" danger onClick={() => setConfirmReset(true)} />

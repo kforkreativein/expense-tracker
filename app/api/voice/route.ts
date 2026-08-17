@@ -106,6 +106,32 @@ export async function POST(request: Request) {
     return fail('bad_request', 'Could not read the recording.', 400);
   }
 
+  const rawContext = form.get('context');
+  let context: VoiceContext;
+  try {
+    context = buildContext(typeof rawContext === 'string' ? JSON.parse(rawContext) : {});
+  } catch {
+    return fail('bad_request', 'Could not read your wallet and category list.', 400);
+  }
+
+  const typed = form.get('text');
+  if (typeof typed === 'string' && typed.trim()) {
+    try {
+      const transcript = typed.trim().slice(0, 500);
+      const parsed = await parseVoiceText(transcript, context);
+      return NextResponse.json<VoiceResult>(
+        { transcript, ...parsed },
+        { headers: NO_STORE },
+      );
+    } catch (err) {
+      console.error('voice text parse failed', err);
+      if (err instanceof GroqError && err.status === 503) {
+        return fail('not_configured', 'Voice entry is not set up on the server yet.', 503);
+      }
+      return fail('upstream', 'Could not understand that text. Please try again.', 502);
+    }
+  }
+
   const audio = form.get('audio');
   if (!(audio instanceof File)) {
     return fail('bad_request', 'No recording was attached.', 400);
@@ -120,14 +146,6 @@ export async function POST(request: Request) {
   const mime = (audio.type || '').split(';')[0].trim().toLowerCase();
   if (mime && !ALLOWED_AUDIO_PREFIXES.includes(mime)) {
     return fail('bad_request', 'That audio format is not supported.', 400);
-  }
-
-  const rawContext = form.get('context');
-  let context: VoiceContext;
-  try {
-    context = buildContext(typeof rawContext === 'string' ? JSON.parse(rawContext) : {});
-  } catch {
-    return fail('bad_request', 'Could not read your wallet and category list.', 400);
   }
 
   try {

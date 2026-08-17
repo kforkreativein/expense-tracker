@@ -96,15 +96,11 @@ export async function isVoiceConfigured(): Promise<boolean> {
   return configuredCache;
 }
 
-export async function transcribeVoice(blob: Blob, mimeType: string): Promise<VoiceResult> {
+async function postVoiceForm(form: FormData, offlineMsg: string, failMsg: string): Promise<VoiceResult> {
   const token = await accessToken();
   if (!token) {
     throw new VoiceRequestError('unauthorized', 'Please log in again to use voice entry.');
   }
-
-  const form = new FormData();
-  form.append('audio', new File([blob], fileNameFor(mimeType), { type: mimeType }));
-  form.append('context', JSON.stringify(buildVoiceContext()));
 
   let res: Response;
   try {
@@ -114,7 +110,7 @@ export async function transcribeVoice(blob: Blob, mimeType: string): Promise<Voi
       body: form,
     });
   } catch {
-    throw new VoiceRequestError('upstream', 'No internet connection. Voice entry needs to be online.');
+    throw new VoiceRequestError('upstream', offlineMsg);
   }
 
   if (!res.ok) {
@@ -122,15 +118,35 @@ export async function transcribeVoice(blob: Blob, mimeType: string): Promise<Voi
     try {
       payload = (await res.json()) as Partial<VoiceErrorResult>;
     } catch {
-      // fall through to the generic message
+      // fall through
     }
-    throw new VoiceRequestError(
-      payload.code ?? 'server',
-      payload.error ?? 'Voice entry failed. Please try again.',
-    );
+    throw new VoiceRequestError(payload.code ?? 'server', payload.error ?? failMsg);
   }
 
   return (await res.json()) as VoiceResult;
+}
+
+export async function transcribeVoice(blob: Blob, mimeType: string): Promise<VoiceResult> {
+  const form = new FormData();
+  form.append('audio', new File([blob], fileNameFor(mimeType), { type: mimeType }));
+  form.append('context', JSON.stringify(buildVoiceContext()));
+  return postVoiceForm(
+    form,
+    'No internet connection. Voice entry needs to be online.',
+    'Voice entry failed. Please try again.',
+  );
+}
+
+/** Type a short note; server uses the same AI parser as voice. */
+export async function parseQuickText(text: string): Promise<VoiceResult> {
+  const form = new FormData();
+  form.append('text', text.trim().slice(0, 500));
+  form.append('context', JSON.stringify(buildVoiceContext()));
+  return postVoiceForm(
+    form,
+    'No internet connection. Text entry needs to be online.',
+    'Could not understand that text. Please try again.',
+  );
 }
 
 /** Upload a receipt photo or statement PDF for AI parsing into draft entries. */

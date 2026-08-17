@@ -224,8 +224,8 @@ export default function SubscriptionsApp({
               <button type="button" onClick={() => onRequestVoice?.()} className="flex w-full items-center gap-3 px-4 py-4 text-left min-h-[64px]">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-600/30 text-lg">🎙️</span>
                 <div>
-                  <p className="font-bold text-white">Hold to talk</p>
-                  <p className="text-xs text-zinc-500">Add one or many — “Netflix 649 and Spotify 59”</p>
+                  <p className="font-bold text-white">Add by voice</p>
+                  <p className="text-xs text-zinc-500">“Netflix 649 and Spotify 59”</p>
                 </div>
               </button>
             )}

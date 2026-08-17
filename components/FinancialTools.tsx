@@ -168,6 +168,8 @@ export default function FinancialTools({
         )}
       </div>
 
+      <WalletBar transactions={transactions} selectedWallet={walletFilter} onSelectWallet={onWalletFilter} onChange={onRefresh} />
+
       <section>
         <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">Commitments</p>
         <div className="rounded-[16px] bg-[#1c1c1e] border border-white/8 divide-y divide-white/8 overflow-hidden">
@@ -199,23 +201,8 @@ export default function FinancialTools({
                 className="clay-btn bg-emerald-500 text-white font-black py-2.5 rounded-[12px]">+ Add EMI</button>
             </div>
           )}
-          <div className="flex w-full items-center gap-3 px-4 py-3.5 min-h-[52px]">
-            <span className="text-lg">💳</span>
-            <span className="flex-1 font-semibold text-white">Payment methods</span>
-            <span className="text-sm text-zinc-500">Wallets below ›</span>
-          </div>
         </div>
       </section>
-
-      <WalletBar transactions={transactions} selectedWallet={walletFilter} onSelectWallet={onWalletFilter} onChange={onRefresh} />
-
-      <BottomTools
-        transactions={transactions}
-        budget={budget}
-        onSetBudget={onSetBudget}
-        onRefresh={onRefresh}
-        recurringRefresh={recurringRefresh}
-      />
 
       <section>
         <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">Calculators</p>
@@ -266,6 +253,14 @@ export default function FinancialTools({
           ))}
         </div>
       </section>
+
+      <BottomTools
+        transactions={transactions}
+        budget={budget}
+        onSetBudget={onSetBudget}
+        onRefresh={onRefresh}
+        recurringRefresh={recurringRefresh}
+      />
     </div>
   );
 }

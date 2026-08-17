@@ -4,7 +4,7 @@ import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
 import { getTransactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
 import { getSplitGroups, adjustForSettledSplits } from '@/lib/splits';
 import { getSplitEnabled, setSplitEnabled } from '@/lib/settings';
-import { applyDueRecurring } from '@/lib/recurring';
+import { applyDueRecurring, dedupeRecurringTransactions } from '@/lib/recurring';
 import { userStorageKey, restoreAuth } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { getCategories } from '@/lib/categories';
@@ -39,6 +39,7 @@ import BottomDock, { AppTab } from '@/components/BottomDock';
 import SiriVoiceOrb from '@/components/SiriVoiceOrb';
 import HomeDashboard from '@/components/HomeDashboard';
 import AddCaptureMenu from '@/components/AddCaptureMenu';
+import TextQuickEntry from '@/components/TextQuickEntry';
 import InsightsTab from '@/components/InsightsTab';
 import FinancialTools from '@/components/FinancialTools';
 
@@ -74,6 +75,7 @@ export default function Home() {
   const [showBudget, setShowBudget] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState('');
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showTextEntry, setShowTextEntry] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [txFilter, setTxFilter] = useState<TxFilter>('all');
   const [importError, setImportError] = useState('');
@@ -158,8 +160,10 @@ export default function Home() {
     registerServiceWorker();
     migrateTransactionsToWallets();
     migrateTransfersToWallets();
+    const removed = dedupeRecurringTransactions();
     const added = applyDueRecurring();
     if (added > 0) setRecurringAdded(added);
+    else if (removed > 0) refresh();
     refresh();
     reloadCategories();
     reloadTransfers();
@@ -183,6 +187,7 @@ export default function Home() {
         setShowAddMenu(true);
         window.history.replaceState({}, '', '/');
       } else if (action === 'voice') {
+        setTab('home');
         setShowVoiceBar(true);
         setVoiceAutoStart(true);
         window.history.replaceState({}, '', '/');
@@ -190,6 +195,7 @@ export default function Home() {
     }
   }, [refresh, reloadCategories, reloadTransfers, reloadSplits]);
 
+  const bootRef = useRef(false);
   useEffect(() => {
     let active = true;
     restoreAuth().then(ok => {
@@ -199,7 +205,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (authenticated) loadAppData();
+    if (!authenticated) {
+      bootRef.current = false;
+      return;
+    }
+    if (bootRef.current) return;
+    bootRef.current = true;
+    loadAppData();
   }, [authenticated, loadAppData]);
 
   useEffect(() => {
@@ -219,8 +231,8 @@ export default function Home() {
     setShowForm(false);
     setWalletFilter(null);
     setViewMode('all');
-    loadAppData();
-  }, [loadAppData]);
+    // loadAppData runs once via authenticated effect + bootRef
+  }, []);
 
   const handleLogout = useCallback(() => {
     applyTheme('light');
@@ -310,6 +322,8 @@ export default function Home() {
   const handleTab = useCallback((next: AppTab) => {
     setTab(next);
     setSheetExpanded(false);
+    setShowVoiceBar(false);
+    setVoiceAutoStart(false);
     if (next === 'split') setSplitGroupId(undefined);
   }, []);
 
@@ -322,7 +336,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh overflow-x-hidden bg-[var(--app-bg)]">
+    <main className={`min-h-dvh overflow-x-hidden bg-[var(--app-bg)] ${sheetExpanded ? 'overflow-hidden h-dvh' : ''}`}>
       <div
         className="max-w-md w-full mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col gap-4 min-w-0 overflow-x-hidden"
         style={{ paddingBottom: 'max(8.5rem, calc(env(safe-area-inset-bottom) + 6.5rem))' }}
@@ -330,6 +344,7 @@ export default function Home() {
         <RecoveryBanner
           currentCount={transactions.length}
           onRestored={() => {
+            dedupeRecurringTransactions();
             const added = applyDueRecurring();
             if (added > 0) setRecurringAdded(added);
             refresh();
@@ -393,7 +408,7 @@ export default function Home() {
             )}
 
             <div className={`sheet-card -mx-4 mt-1 min-h-[42vh] px-4 pb-4 pt-2 ${sheetExpanded ? 'is-expanded' : ''}`}>
-              <div className="flex flex-col items-center gap-1">
+              <div className="sheet-chrome shrink-0 flex flex-col items-center gap-1">
                 <button
                   type="button"
                   aria-label={sheetExpanded ? 'Collapse transactions' : 'Expand transactions'}
@@ -403,48 +418,59 @@ export default function Home() {
                   <span className="mb-1 h-1 w-10 rounded-full bg-zinc-600" />
                 </button>
                 {voiceEnabled && (
-                  <SiriVoiceOrb
-                    active={showVoiceBar}
-                    onActivate={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
-                  />
+                  <div className="flex items-center gap-2 py-1">
+                    <SiriVoiceOrb
+                      active={showVoiceBar}
+                      onActivate={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
+                    />
+                    {showVoiceBar && (
+                      <VoiceButton
+                        variant="icon"
+                        autoStart={voiceAutoStart}
+                        onResult={handleVoiceResult}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 pt-2">
-                <div className="overflow-x-auto -mx-1 px-1">
-                  <div className="flex min-w-max gap-1.5 rounded-full bg-black/30 p-1">
-                    {([
-                      { id: 'all' as TxFilter, label: 'ALL' },
-                      { id: 'expense' as TxFilter, label: 'EXPENSES' },
-                      { id: 'income' as TxFilter, label: 'INCOME' },
-                      { id: 'transfer' as TxFilter, label: 'TRANSFERS' },
-                    ]).map(f => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setTxFilter(f.id)}
-                        className={`rounded-full px-3.5 py-2.5 text-[11px] font-black tracking-wide min-h-[40px] ${
-                          txFilter === f.id ? 'bg-zinc-200 text-black' : 'text-zinc-400 border border-white/10'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
+              <div className="sheet-body flex flex-col gap-3 pt-2 min-h-0">
+                <div className="shrink-0 grid grid-cols-4 gap-1 rounded-2xl bg-black/40 p-1">
+                  {([
+                    { id: 'all' as TxFilter, label: 'All' },
+                    { id: 'expense' as TxFilter, label: 'Expenses' },
+                    { id: 'income' as TxFilter, label: 'Income' },
+                    { id: 'transfer' as TxFilter, label: 'Transfers' },
+                  ]).map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setTxFilter(f.id)}
+                      className={`rounded-xl py-2.5 text-[11px] font-black tracking-wide min-h-[40px] transition-colors ${
+                        txFilter === f.id
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
 
-                <TransactionList
-                  transactions={listTransactions}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  walletFilter={walletFilter}
-                  categoryFilter={categoryFilter}
-                  onRecurringChange={handleRecurringChange}
-                  search={search}
-                  onSearchChange={setSearch}
-                  hideSearchBar
-                  onOpenSplitGroup={id => { setSplitGroupId(id); setTab('split'); }}
-                />
+                <div className="sheet-scroll min-h-0 flex-1">
+                  <TransactionList
+                    transactions={listTransactions}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    walletFilter={walletFilter}
+                    categoryFilter={categoryFilter}
+                    onRecurringChange={handleRecurringChange}
+                    search={search}
+                    onSearchChange={setSearch}
+                    hideSearchBar
+                    onOpenSplitGroup={id => { setSplitGroupId(id); setTab('split'); }}
+                  />
+                </div>
               </div>
             </div>
           </>
@@ -488,6 +514,7 @@ export default function Home() {
             voiceEnabled={voiceEnabled}
             onRequestVoice={() => {
               setSubVoiceMode(true);
+              setTab('home');
               setShowVoiceBar(true);
               setVoiceAutoStart(true);
             }}
@@ -512,10 +539,18 @@ export default function Home() {
         open={showAddMenu}
         onClose={() => setShowAddMenu(false)}
         onManual={() => setShowForm(true)}
-        onVoice={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
+        onText={() => setShowTextEntry(true)}
+        onVoice={() => { setTab('home'); setShowVoiceBar(true); setVoiceAutoStart(true); }}
         onImage={handleImportFile}
         onPdf={handleImportFile}
         voiceAvailable={voiceEnabled}
+        textAvailable={voiceEnabled}
+      />
+
+      <TextQuickEntry
+        open={showTextEntry}
+        onClose={() => setShowTextEntry(false)}
+        onResult={handleVoiceResult}
       />
 
       {showForm && (
@@ -563,22 +598,20 @@ export default function Home() {
         }} />
       )}
 
-      {voiceEnabled && showVoiceBar && !showForm && !voiceResult && !showOnboarding && !showStreakPopup && (
+      {voiceEnabled && tab === 'home' && showVoiceBar && !showForm && !voiceResult && !showOnboarding && !showStreakPopup && (
         <div
           className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)' }}>
-          <div className="w-full max-w-md pointer-events-auto">
-            <VoiceButton
-              variant="bar"
-              autoStart={voiceAutoStart}
-              onResult={handleVoiceResult}
-            />
+          <div className="pointer-events-auto flex flex-col items-center gap-2">
+            <p className="rounded-full bg-black/70 px-3 py-1 text-[11px] font-bold text-zinc-300">
+              Mic ready — hold the amber button
+            </p>
             <button
               type="button"
               onClick={() => { setShowVoiceBar(false); setVoiceAutoStart(false); }}
-              className="mt-2 w-full text-center text-xs font-bold text-zinc-400"
+              className="text-xs font-bold text-zinc-400"
             >
-              Cancel listening
+              Cancel
             </button>
           </div>
         </div>

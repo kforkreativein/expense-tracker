@@ -1,5 +1,5 @@
 import { RecurringRule, Transaction, Frequency } from './types';
-import { addTransaction, updateTransaction } from './storage';
+import { addTransaction, getTransactions, updateTransaction, deleteTransaction } from './storage';
 import { walletToPaymentMode } from './wallets';
 import { userStorageKey } from './auth';
 import { scheduleCloudSync } from './supabase/sync';
@@ -8,6 +8,19 @@ const KEY = 'money_buddy_recurring';
 
 function storageKey() {
   return userStorageKey(KEY);
+}
+
+/** Local calendar YYYY-MM-DD (avoids UTC midnight drift). */
+function localDateKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseLocalDate(dateStr: string) {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 }
 
 export function getRules(): RecurringRule[] {
@@ -25,7 +38,7 @@ export function addRule(rule: RecurringRule) {
 }
 
 export function updateRule(id: string, patch: Partial<RecurringRule>) {
-  save(getRules().map(r => r.id === id ? { ...r, ...patch } : r));
+  save(getRules().map(r => (r.id === id ? { ...r, ...patch } : r)));
 }
 
 export function deleteRule(id: string) {
@@ -48,11 +61,11 @@ export function findRuleForTransaction(txn: Transaction): RecurringRule | undefi
 }
 
 export function computeNextDue(fromDate: string, frequency: Frequency): string {
-  const d = new Date(fromDate);
+  const d = parseLocalDate(fromDate);
   if (frequency === 'daily') d.setDate(d.getDate() + 1);
   else if (frequency === 'weekly') d.setDate(d.getDate() + 7);
   else d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 }
 
 function advance(dateStr: string, freq: RecurringRule['frequency']): string {
@@ -110,33 +123,70 @@ export function syncRuleForTransaction(
   return updated;
 }
 
-// Call on app load — auto-adds any overdue entries and advances nextDue
+/**
+ * Remove duplicate auto-generated recurring rows (same rule + date),
+ * keeping the earliest createdAt. Returns how many were deleted.
+ */
+export function dedupeRecurringTransactions(): number {
+  const txns = getTransactions();
+  const keep = new Map<string, string>();
+  const remove: string[] = [];
+
+  const sorted = [...txns].sort((a, b) => a.createdAt - b.createdAt);
+  for (const t of sorted) {
+    if (!t.recurringRuleId) continue;
+    const key = `${t.recurringRuleId}|${t.date.slice(0, 10)}`;
+    if (keep.has(key)) remove.push(t.id);
+    else keep.set(key, t.id);
+  }
+
+  for (const id of remove) deleteTransaction(id);
+  return remove.length;
+}
+
+/** Call on app load — auto-adds overdue entries once per due date, advances nextDue. */
 export function applyDueRecurring(): number {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   const rules = getRules();
+  if (!rules.length) return 0;
+
+  const existing = getTransactions();
+  const seen = new Set(
+    existing
+      .filter(t => t.recurringRuleId)
+      .map(t => `${t.recurringRuleId}|${t.date.slice(0, 10)}`),
+  );
+
   let count = 0;
   const updated = rules.map(rule => {
     let r = { ...rule };
-    while (r.nextDue <= today) {
-      const pm = walletToPaymentMode(r.walletId);
-      addTransaction({
-        id: crypto.randomUUID(),
-        type: r.type,
-        amount: r.amount,
-        description: r.description,
-        walletId: r.walletId,
-        categoryId: r.categoryId,
-        recurringRuleId: r.id,
-        paymentMode: pm.paymentMode,
-        bank: pm.bank,
-        date: r.nextDue,
-        createdAt: Date.now(),
-      } as Transaction);
-      count++;
-      r = { ...r, nextDue: advance(r.nextDue, r.frequency) };
+    let guard = 0;
+    while (r.nextDue.slice(0, 10) <= today && guard++ < 400) {
+      const due = r.nextDue.slice(0, 10);
+      const key = `${r.id}|${due}`;
+      if (!seen.has(key)) {
+        const pm = walletToPaymentMode(r.walletId);
+        addTransaction({
+          id: crypto.randomUUID(),
+          type: r.type,
+          amount: r.amount,
+          description: r.description,
+          walletId: r.walletId,
+          categoryId: r.categoryId,
+          recurringRuleId: r.id,
+          paymentMode: pm.paymentMode,
+          bank: pm.bank,
+          date: due,
+          createdAt: Date.now(),
+        } as Transaction);
+        seen.add(key);
+        count++;
+      }
+      r = { ...r, nextDue: advance(due, r.frequency) };
     }
     return r;
   });
+
   save(updated);
   return count;
 }
