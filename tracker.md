@@ -103,7 +103,7 @@
 | 59 | Business profit snapshot | ✅ Completed | Business income − expense this month |
 | 60 | Daily welcome + streak | ✅ Completed | First visit each day greets you; streak badge in header |
 | 61 | Split groups cloud sync | ✅ Completed | Split groups + credit card wallet fields now sync to Supabase (split_groups table, wallet CC columns) |
-| 62 | Custom split shares | ✅ Completed | Equal (default) or Custom ₹ per person; last person auto-fills the remainder |
+| 62 | Custom split shares | ✅ Completed | Equal (default) or Custom ₹ per person; last person auto-fills the remainder. Equal split is always whole rupees — the payer absorbs the leftover rupee(s) (₹100 ÷ 3 = 34/33/33, never .33) |
 | 63 | Settled group net expense | ✅ Completed | Once a group is settled, stats count only my share (wallet history unchanged) |
 | 64 | Settle-pending flow | ✅ Completed | Mark-settled asks per person: record payment or 🕊️ let it go |
 | 65 | Remove member (settle first) | ✅ Completed | Must settle balance before removal; former members grayed out, kept on old entries |
@@ -121,7 +121,8 @@
 | 72 | Auto spend-category from note | ✅ Completed | Typing "Zomato", "chai", "uber" etc. auto-selects Food / Transport / …; manual chip picks win |
 | 73 | Dark dashboard home + expandable sheet | ✅ Completed | Pie split, monthly budget bar, month picker modal, ALL/EXPENSES/INCOME filters; sheet expands full-screen |
 | 74 | Bottom dock: Home / Insights / Split / Tools / Settings | ✅ Completed | Green + FAB opens capture menu; 3rd tab is Split (±), not plus |
-| 75 | Siri orb voice + image/PDF import | ✅ Completed | Hold or double-tap orb to talk; + menu for mic, photo, PDF statement → AI draft entries |
+| 75 | Voice orb + image/PDF import | ✅ Completed | One floating Siri-style orb, fixed just above the bottom dock on Home and Split — hold to talk, double-tap for hands-free. No separate mic button or "mic ready" banner. + menu still offers photo/PDF statement → AI draft entries |
+| 81 | Voice-add a split bill | ✅ Completed | Orb also appears inside an open Split group. "₹100 paid by Pratham, split equally" (or just a member's name / "split among everyone") prefills the Add Expense form — payer, amount, and equal split among the right people — for a one-tap confirm |
 | 76 | AI Insights tab | ✅ Completed | Pacing / top-category cards with refresh; charts & wallets live here |
 | 77 | Financial Tools tab | ✅ Completed | Subscriptions, EMIs, wallets, FD/RD + tax + EMI calculators, CSV export |
 | 78 | Streak once-per-local-day | ✅ Completed | Uses local calendar date (not UTC); cloud merge keeps fresher visit; popup at most once/day |

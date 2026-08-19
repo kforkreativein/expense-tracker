@@ -33,10 +33,9 @@ import TransactionForm from '@/components/TransactionForm';
 import TransactionList from '@/components/TransactionList';
 import RecoveryBanner from '@/components/RecoveryBanner';
 import SplitTab from '@/components/SplitTab';
-import VoiceButton from '@/components/VoiceButton';
 import VoiceConfirmSheet from '@/components/VoiceConfirmSheet';
 import BottomDock, { AppTab } from '@/components/BottomDock';
-import SiriVoiceOrb from '@/components/SiriVoiceOrb';
+import FloatingVoiceOrb from '@/components/FloatingVoiceOrb';
 import HomeDashboard from '@/components/HomeDashboard';
 import AddCaptureMenu from '@/components/AddCaptureMenu';
 import TextQuickEntry from '@/components/TextQuickEntry';
@@ -65,7 +64,6 @@ export default function Home() {
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
   const [splitEnabled, setSplitEnabledState] = useState(false);
   const [voiceAutoStart, setVoiceAutoStart] = useState(false);
-  const [showVoiceBar, setShowVoiceBar] = useState(false);
   const [voiceResult, setVoiceResult] = useState<{ id: number; data: VoiceResult } | null>(null);
   const voiceSeq = useRef(0);
   const canRecord = useSyncExternalStore(() => () => {}, isRecordingSupported, () => false);
@@ -188,7 +186,6 @@ export default function Home() {
         window.history.replaceState({}, '', '/');
       } else if (action === 'voice') {
         setTab('home');
-        setShowVoiceBar(true);
         setVoiceAutoStart(true);
         window.history.replaceState({}, '', '/');
       }
@@ -268,7 +265,6 @@ export default function Home() {
 
   const handleVoiceResult = useCallback((data: VoiceResult) => {
     voiceSeq.current += 1;
-    setShowVoiceBar(false);
     setVoiceAutoStart(false);
     if (subVoiceMode && data.intent === 'entries' && data.entries?.length) {
       setVoiceSubDrafts(
@@ -322,7 +318,6 @@ export default function Home() {
   const handleTab = useCallback((next: AppTab) => {
     setTab(next);
     setSheetExpanded(false);
-    setShowVoiceBar(false);
     setVoiceAutoStart(false);
     if (next === 'split') setSplitGroupId(undefined);
   }, []);
@@ -417,21 +412,6 @@ export default function Home() {
                 >
                   <span className="mb-1 h-1 w-10 rounded-full bg-zinc-600" />
                 </button>
-                {voiceEnabled && (
-                  <div className="flex items-center gap-2 py-1">
-                    <SiriVoiceOrb
-                      active={showVoiceBar}
-                      onActivate={() => { setShowVoiceBar(true); setVoiceAutoStart(true); }}
-                    />
-                    {showVoiceBar && (
-                      <VoiceButton
-                        variant="icon"
-                        autoStart={voiceAutoStart}
-                        onResult={handleVoiceResult}
-                      />
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="sheet-body flex flex-col gap-3 pt-2 min-h-0">
@@ -498,6 +478,7 @@ export default function Home() {
             onClose={() => setTab('home')}
             onExpenseAdded={() => { refresh(); reloadSplits(); }}
             initialGroupId={splitGroupId}
+            voiceEnabled={voiceEnabled}
           />
         )}
 
@@ -515,7 +496,6 @@ export default function Home() {
             onRequestVoice={() => {
               setSubVoiceMode(true);
               setTab('home');
-              setShowVoiceBar(true);
               setVoiceAutoStart(true);
             }}
             voiceSubDrafts={voiceSubDrafts}
@@ -540,7 +520,7 @@ export default function Home() {
         onClose={() => setShowAddMenu(false)}
         onManual={() => setShowForm(true)}
         onText={() => setShowTextEntry(true)}
-        onVoice={() => { setTab('home'); setShowVoiceBar(true); setVoiceAutoStart(true); }}
+        onVoice={() => { setTab('home'); setVoiceAutoStart(true); }}
         onImage={handleImportFile}
         onPdf={handleImportFile}
         voiceAvailable={voiceEnabled}
@@ -598,23 +578,8 @@ export default function Home() {
         }} />
       )}
 
-      {voiceEnabled && tab === 'home' && showVoiceBar && !showForm && !voiceResult && !showOnboarding && !showStreakPopup && (
-        <div
-          className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.25rem)' }}>
-          <div className="pointer-events-auto flex flex-col items-center gap-2">
-            <p className="rounded-full bg-black/70 px-3 py-1 text-[11px] font-bold text-zinc-300">
-              Mic ready — hold the amber button
-            </p>
-            <button
-              type="button"
-              onClick={() => { setShowVoiceBar(false); setVoiceAutoStart(false); }}
-              className="text-xs font-bold text-zinc-400"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {voiceEnabled && tab === 'home' && !showForm && !voiceResult && !showOnboarding && !showStreakPopup && (
+        <FloatingVoiceOrb onResult={handleVoiceResult} autoStart={voiceAutoStart} />
       )}
     </main>
   );

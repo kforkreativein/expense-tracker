@@ -1,14 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { SplitGroup, Wallet, Category } from '@/lib/types';
+import { SplitGroup, SplitEntry, Wallet, Category } from '@/lib/types';
 import {
   getSplitGroups, addSplitGroup, addSplitEntry, deleteSplitEntry,
   settleGroup, calcBalances, groupNetTotal, updateSplitGroup, deleteSplitGroup,
-  shareOf, myNetShare, removeMemberToFormer, setOpeningBalance,
+  shareOf, myNetShare, removeMemberToFormer, setOpeningBalance, equalShares,
 } from '@/lib/splits';
 import { addTransaction } from '@/lib/storage';
 import { getWallets } from '@/lib/wallets';
 import { getCategories } from '@/lib/categories';
+import FloatingVoiceOrb from './FloatingVoiceOrb';
+import { VoiceResult } from '@/lib/voice/types';
 
 interface Props {
   onClose: () => void;
@@ -16,13 +18,21 @@ interface Props {
   initialGroupId?: string;
   /** When true, renders inline as a tab (no modal overlay). */
   embedded?: boolean;
+  voiceEnabled?: boolean;
 }
 
 type View = 'list' | 'detail' | 'new-group' | 'new-entry' | 'settle' | 'settle-pending';
 
 const fmt = (n: number) =>
-  `₹${Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  `₹${Math.round(Math.abs(n)).toLocaleString('en-IN')}`;
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** Whole-rupee equal splits store explicit shares too, so this only flags genuinely custom ones. */
+const isCustomSplit = (e: SplitEntry) => {
+  if (!e.shares) return false;
+  const equal = equalShares(e.totalAmount, e.splitAmong, e.paidBy);
+  return e.splitAmong.some(p => (e.shares![p] ?? 0) !== (equal[p] ?? 0));
+};
 
 // Keep only digits, dot and one leading +/- sign
 const sanitizeSigned = (s: string) => {
@@ -34,7 +44,7 @@ const parseSigned = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embedded }: Props) {
+export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embedded, voiceEnabled }: Props) {
   const [view, setView] = useState<View>(initialGroupId ? 'detail' : 'list');
   const [groups, setGroups] = useState<SplitGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialGroupId ?? null);
@@ -226,7 +236,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
   }
 
   function handleAddEntry() {
-    const amount = Number(entryAmount);
+    const amount = Math.round(Number(entryAmount));
     if (!entryDesc.trim() || !amount || !selectedId || entrySplitAmong.length === 0) return;
     const group = groups.find(g => g.id === selectedId);
     if (!group) return;
@@ -241,8 +251,11 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
       }
       shares = {};
       for (const p of entrySplitAmong) {
-        shares[p] = p === auto ? remainder : (Number(customShares[p]) || 0);
+        shares[p] = p === auto ? Math.round(remainder) : Math.round(Number(customShares[p]) || 0);
       }
+    } else if (entrySplitAmong.length > 1) {
+      // Equal split, whole rupees only — the payer absorbs the leftover rupee(s).
+      shares = equalShares(amount, entrySplitAmong, entryPaidBy);
     }
 
     let linkedTransactionId: string | undefined;
@@ -277,6 +290,42 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
     setView('detail');
   }
 
+  /**
+   * The orb prefills the Add Expense form instead of saving straight away —
+   * money still needs a tap to confirm, same as every other voice entry in the app.
+   */
+  function handleVoiceResult(result: VoiceResult) {
+    if (!selectedGroup) return;
+    const allNames = ['me', ...selectedGroup.members];
+
+    if (result.intent === 'split' && result.splitEntry && result.splitEntry.amount > 0) {
+      const se = result.splitEntry;
+      const paidBy = allNames.includes(se.paidBy) ? se.paidBy : 'me';
+      let splitAmong = se.splitAmong.filter(p => allNames.includes(p));
+      if (splitAmong.length === 0) splitAmong = allNames;
+      openNewEntry(selectedGroup);
+      setEntryDesc(se.description.trim() || 'Expense');
+      setEntryAmount(String(Math.round(se.amount)));
+      setEntryPaidBy(paidBy);
+      setEntrySplitAmong(splitAmong);
+      setSplitMode('equal');
+      return;
+    }
+
+    if (result.intent === 'entries' && result.entries.length === 1 && result.entries[0].amount > 0) {
+      const e = result.entries[0];
+      openNewEntry(selectedGroup);
+      setEntryDesc(e.description.trim() || 'Expense');
+      setEntryAmount(String(Math.round(e.amount)));
+      setEntryPaidBy('me');
+      setEntrySplitAmong(allNames);
+      setSplitMode('equal');
+      return;
+    }
+
+    alert(result.note || 'Couldn’t catch that. Try: "100 rupees paid by Pratham, split equally".');
+  }
+
   function openSettle(person: string, balance: number, from: 'detail' | 'settle-pending' = 'detail') {
     setSettlePerson(person);
     setSettleAmount(String(Math.abs(balance)));
@@ -290,7 +339,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
   }
 
   function handleConfirmSettle() {
-    const amount = Number(settleAmount);
+    const amount = Math.round(Number(settleAmount));
     if (!amount || !selectedId || !settlePerson) return;
     const group = groups.find(g => g.id === selectedId);
     if (!group) return;
@@ -678,7 +727,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
                         <>
                           <p className="text-xs font-semibold text-stone-400">
                             {e.paidBy === 'me' ? 'You paid' : `${e.paidBy} paid`}
-                            {' · '}split {e.splitAmong.length} ways{e.shares ? ' (custom)' : ''}
+                            {' · '}split {e.splitAmong.length} ways{isCustomSplit(e) ? ' (custom)' : ''}
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {e.splitAmong.map(p => {
@@ -1113,7 +1162,12 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
       </div>
   );
 
-  if (embedded) return body;
+  const showOrb = voiceEnabled && !!selectedGroup && view !== 'list' && view !== 'new-group';
+  const orb = showOrb && selectedGroup && (
+    <FloatingVoiceOrb onResult={handleVoiceResult} splitMembers={selectedGroup.members} />
+  );
+
+  if (embedded) return <>{body}{orb}</>;
 
   return (
     <div
@@ -1121,6 +1175,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
       style={{ background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}>
       {body}
+      {orb}
     </div>
   );
 }

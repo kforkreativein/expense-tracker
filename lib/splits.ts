@@ -88,11 +88,29 @@ export function removeMemberToFormer(groupId: string, name: string) {
   ));
 }
 
+/**
+ * Whole-rupee equal split — no decimals, ever. The leftover rupee(s) from
+ * division go to whoever paid, so ₹100 among 3 becomes 34/33/33 with the
+ * payer at 34, instead of 33.33 each.
+ */
+export function equalShares(totalAmount: number, splitAmong: string[], paidBy: string): Record<string, number> {
+  const n = splitAmong.length;
+  if (n === 0) return {};
+  const total = Math.round(totalAmount);
+  const base = Math.floor(total / n);
+  const remainder = total - base * n;
+  const shares: Record<string, number> = {};
+  for (const p of splitAmong) shares[p] = base;
+  const target = splitAmong.includes(paidBy) ? paidBy : splitAmong[0];
+  shares[target] += remainder;
+  return shares;
+}
+
 /** A person's ₹ share of an entry — custom amount if set, else equal split. */
 export function shareOf(entry: SplitEntry, person: string): number {
   if (!entry.splitAmong.includes(person)) return 0;
   if (entry.shares && entry.shares[person] != null) return entry.shares[person];
-  return entry.totalAmount / entry.splitAmong.length;
+  return equalShares(entry.totalAmount, entry.splitAmong, entry.paidBy)[person] ?? 0;
 }
 
 // Per-member net: positive = they owe me, negative = I owe them

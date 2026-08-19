@@ -46,7 +46,7 @@ export function mostUsedWalletId(): string | null {
   return best ?? wallets[0].id;
 }
 
-export function buildVoiceContext(): VoiceContext {
+export function buildVoiceContext(extra?: { splitMembers?: string[] }): VoiceContext {
   const types = getCategories();
   const spendCategories = getSpendCategories();
 
@@ -58,6 +58,7 @@ export function buildVoiceContext(): VoiceContext {
     spendCategoryHints: spendCategoryHints(spendCategories),
     defaultWalletId: mostUsedWalletId(),
     defaultTypeId: types.find(c => c.name.trim().toLowerCase() === 'personal')?.id ?? null,
+    splitMembers: (extra?.splitMembers ?? []).map(name => ({ id: name, name })),
   };
 }
 
@@ -126,10 +127,10 @@ async function postVoiceForm(form: FormData, offlineMsg: string, failMsg: string
   return (await res.json()) as VoiceResult;
 }
 
-export async function transcribeVoice(blob: Blob, mimeType: string): Promise<VoiceResult> {
+export async function transcribeVoice(blob: Blob, mimeType: string, splitMembers?: string[]): Promise<VoiceResult> {
   const form = new FormData();
   form.append('audio', new File([blob], fileNameFor(mimeType), { type: mimeType }));
-  form.append('context', JSON.stringify(buildVoiceContext()));
+  form.append('context', JSON.stringify(buildVoiceContext({ splitMembers })));
   return postVoiceForm(
     form,
     'No internet connection. Voice entry needs to be online.',

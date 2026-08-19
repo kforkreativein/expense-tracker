@@ -414,7 +414,7 @@ const DEFAULT_CARDS = [
   { id:'c22', col:'done', title:'tracker.md feature list',             meta:'Markdown table with all 37+ features',     tag:'Docs' },
   { id:'c23', col:'done', title:'tracker.html Kanban board',           meta:'Drag-drop, manual entries, auto-save',     tag:'Docs' },
   { id:'f17', col:'done', title:'Split groups cloud sync',             meta:'split_groups table + credit-card wallet columns sync to Supabase', tag:'Platform' },
-  { id:'f18', col:'done', title:'Custom split shares',                 meta:'Equal (default) or custom ₹ per person, last person auto-fills', tag:'Feature' },
+  { id:'f18', col:'done', title:'Custom split shares',                 meta:'Equal (default) or custom ₹ per person, last person auto-fills. Equal split is whole rupees only — payer gets the leftover rupee(s)', tag:'Feature' },
   { id:'f19', col:'done', title:'Settled group net expense',           meta:'Stats count only my share once group is settled', tag:'Feature' },
   { id:'f20', col:'done', title:'Settle-pending flow',                 meta:'Mark settled asks: record payment or let it go', tag:'Feature' },
   { id:'f21', col:'done', title:'Remove member (settle first)',        meta:'Former members grayed out, kept on old entries', tag:'Feature' },
@@ -428,11 +428,12 @@ const DEFAULT_CARDS = [
   { id:'f29', col:'done', title:'Auto spend-category from note',        meta:'Zomato/chai/uber etc. pick Food/Transport automatically; manual chip wins', tag:'Feature' },
   { id:'f30', col:'done', title:'Dark dashboard home + sheet',          meta:'Pie split, budget bar, month modal, expandable transaction sheet', tag:'UI/UX' },
   { id:'f31', col:'done', title:'Dock: Split tab + capture menu',       meta:'3rd tab is Split; green + opens mic/photo/PDF/manual', tag:'UI/UX' },
-  { id:'f32', col:'done', title:'Siri orb + statement import',          meta:'Hold/double-tap orb to talk; AI parses receipt photos & PDFs', tag:'Feature' },
+  { id:'f32', col:'done', title:'Voice orb + statement import',         meta:'One floating orb fixed above the dock, hold/double-tap to talk — no separate mic button or banner; AI parses receipt photos & PDFs', tag:'Feature' },
   { id:'f33', col:'done', title:'AI Insights + Financial Tools',        meta:'Pacing cards, calculators, subscriptions & EMIs', tag:'Feature' },
   { id:'f34', col:'done', title:'Streak once per local day',            meta:'Local calendar date + smarter cloud merge; popup once/day', tag:'Bugfix' },
   { id:'f35', col:'done', title:'Premium Settings hub',                 meta:'Account home, profile, categories, notifications, backup — no locks', tag:'UI/UX' },
   { id:'f36', col:'done', title:'Subscriptions + calendar',             meta:'Hub from Tools; voice/catalog add; filters; renewal calendar', tag:'Feature' },
+  { id:'f37', col:'done', title:'Voice-add a split bill',               meta:'Orb also lives inside an open Split group; "₹100 paid by Pratham split equally" prefills the Add Expense form for a one-tap confirm', tag:'Feature' },
 ];
 
 function loadCards() {

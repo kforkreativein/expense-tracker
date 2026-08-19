@@ -45,6 +45,7 @@ function buildContext(raw: unknown): VoiceContext {
     spendCategoryHints: typeof obj.spendCategoryHints === 'string' ? obj.spendCategoryHints.slice(0, 1200) : '',
     defaultWalletId: typeof obj.defaultWalletId === 'string' ? obj.defaultWalletId.slice(0, 64) : null,
     defaultTypeId: typeof obj.defaultTypeId === 'string' ? obj.defaultTypeId.slice(0, 64) : null,
+    splitMembers: cleanItems(obj.splitMembers, 20),
   };
 }
 

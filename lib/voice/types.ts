@@ -1,6 +1,6 @@
 /** Shapes shared by the browser and the /api/voice route. */
 
-export type VoiceIntent = 'entries' | 'query' | 'unclear';
+export type VoiceIntent = 'entries' | 'query' | 'split' | 'unclear';
 
 export interface VoiceContextItem {
   id: string;
@@ -21,6 +21,8 @@ export interface VoiceContext {
   spendCategoryHints: string;
   defaultWalletId: string | null;
   defaultTypeId: string | null;
+  /** Other members of the split group currently open, if any (id = name). Empty when not splitting. */
+  splitMembers: VoiceContextItem[];
 }
 
 export interface ParsedEntry {
@@ -55,11 +57,22 @@ export interface ParsedQuery {
   period: QueryPeriod;
 }
 
+/** A shared bill spoken while inside a split group, e.g. "100 paid by Pratham split equally". */
+export interface ParsedSplitEntry {
+  amount: number;
+  description: string;
+  /** "me" or an exact name from VoiceContext.splitMembers */
+  paidBy: string;
+  /** "me" and/or exact names from VoiceContext.splitMembers */
+  splitAmong: string[];
+}
+
 export interface VoiceResult {
   transcript: string;
   intent: VoiceIntent;
   entries: ParsedEntry[];
   query: ParsedQuery | null;
+  splitEntry: ParsedSplitEntry | null;
   /** Short human-readable note when something could not be understood */
   note: string;
 }

@@ -8,8 +8,10 @@ interface Props {
   onResult: (result: VoiceResult) => void;
   /** Start listening immediately (deep link from the phone shortcut). */
   autoStart?: boolean;
-  /** Full-width hold-to-talk bar, or a compact icon next to Add. */
-  variant?: 'icon' | 'bar';
+  /** Full-width hold-to-talk bar, a compact icon next to Add, or the floating dock orb. */
+  variant?: 'icon' | 'bar' | 'orb';
+  /** Other members of the split group currently open, so speech can be parsed as a shared bill. */
+  splitMembers?: string[];
 }
 
 type Phase = 'idle' | 'starting' | 'recording' | 'sending';
@@ -40,7 +42,7 @@ function formatElapsed(ms: number): string {
 const subscribeNever = () => () => {};
 const serverSnapshot = () => false;
 
-export default function VoiceButton({ onResult, autoStart = false, variant = 'icon' }: Props) {
+export default function VoiceButton({ onResult, autoStart = false, variant = 'icon', splitMembers }: Props) {
   const supported = useSyncExternalStore(subscribeNever, isRecordingSupported, serverSnapshot);
   const [phase, setPhase] = useState<Phase>('idle');
   const [mode, setMode] = useState<Mode>('hold');
@@ -107,7 +109,7 @@ export default function VoiceButton({ onResult, autoStart = false, variant = 'ic
     goTo('sending');
     buzz(12);
     try {
-      const result = await transcribeVoice(captured.blob, captured.mimeType);
+      const result = await transcribeVoice(captured.blob, captured.mimeType, splitMembers);
       goTo('idle');
       onResult(result);
     } catch (err) {
@@ -118,7 +120,7 @@ export default function VoiceButton({ onResult, autoStart = false, variant = 'ic
           : 'Voice entry failed. Please try again.',
       );
     }
-  }, [clearTimers, goTo, onResult, resetVisuals, showHint]);
+  }, [clearTimers, goTo, onResult, resetVisuals, showHint, splitMembers]);
 
   const begin = useCallback(async (nextMode: Mode) => {
     if (phaseRef.current !== 'idle') return;
@@ -252,50 +254,75 @@ export default function VoiceButton({ onResult, autoStart = false, variant = 'ic
   const isBusy = phase === 'sending' || phase === 'starting';
   const nearLimit = elapsed >= WARN_AT_MS;
 
+  const floating = variant === 'bar' || variant === 'orb';
+
   return (
     <>
-      <button
-        type="button"
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onKeyDown={handleKeyDown}
-        onContextMenu={e => e.preventDefault()}
-        disabled={isBusy}
-        aria-label={isRecording ? 'Stop recording' : 'Hold to record an entry by voice'}
-        aria-pressed={isRecording}
-        className={variant === 'bar'
-          ? `clay-btn clay w-full py-4 min-h-[56px] flex items-center justify-center gap-2 text-base font-black relative select-none touch-none ${
-              isRecording ? 'clay-red text-red-900' : isBusy ? 'clay-amber text-amber-900 opacity-80' : 'clay-amber text-amber-900'
-            }`
-          : `clay-btn clay shrink-0 w-[60px] min-h-[52px] flex items-center justify-center text-2xl relative select-none touch-none ${
-              isRecording ? 'clay-red' : isBusy ? 'clay-amber opacity-80' : 'clay-amber'
-            }`
-        }
-        style={{ WebkitTouchCallout: 'none' }}>
-        {isBusy && phase === 'sending' ? '⏳' : isRecording ? '⏺️' : '🎤'}
-        {variant === 'bar' && (
-          <span>
-            {isBusy && phase === 'sending'
-              ? 'Understanding…'
-              : isRecording
-                ? (mode === 'hold' ? 'Release to save' : 'Tap to stop')
-                : 'Hold to talk'}
-          </span>
-        )}
-        {isRecording && (
-          <span
-            aria-hidden
-            className="absolute inset-0 rounded-[20px] border-2 border-rose-400/70 animate-ping pointer-events-none"
-          />
-        )}
-      </button>
+      {variant === 'orb' ? (
+        <button
+          type="button"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onKeyDown={handleKeyDown}
+          onContextMenu={e => e.preventDefault()}
+          disabled={isBusy}
+          aria-label={isRecording ? 'Stop recording' : 'Hold or double-tap the orb to talk'}
+          aria-pressed={isRecording}
+          className="siri-orb relative flex h-14 w-14 items-center justify-center rounded-full select-none touch-none"
+          style={{ WebkitTouchCallout: 'none' }}>
+          <span className={`siri-orb__glow ${isRecording || isBusy ? 'is-holding' : ''}`} />
+          {isRecording && (
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-full border-2 border-rose-400/70 animate-ping pointer-events-none"
+            />
+          )}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onKeyDown={handleKeyDown}
+          onContextMenu={e => e.preventDefault()}
+          disabled={isBusy}
+          aria-label={isRecording ? 'Stop recording' : 'Hold to record an entry by voice'}
+          aria-pressed={isRecording}
+          className={variant === 'bar'
+            ? `clay-btn clay w-full py-4 min-h-[56px] flex items-center justify-center gap-2 text-base font-black relative select-none touch-none ${
+                isRecording ? 'clay-red text-red-900' : isBusy ? 'clay-amber text-amber-900 opacity-80' : 'clay-amber text-amber-900'
+              }`
+            : `clay-btn clay shrink-0 w-[60px] min-h-[52px] flex items-center justify-center text-2xl relative select-none touch-none ${
+                isRecording ? 'clay-red' : isBusy ? 'clay-amber opacity-80' : 'clay-amber'
+              }`
+          }
+          style={{ WebkitTouchCallout: 'none' }}>
+          {isBusy && phase === 'sending' ? '⏳' : isRecording ? '⏺️' : '🎤'}
+          {variant === 'bar' && (
+            <span>
+              {isBusy && phase === 'sending'
+                ? 'Understanding…'
+                : isRecording
+                  ? (mode === 'hold' ? 'Release to save' : 'Tap to stop')
+                  : 'Hold to talk'}
+            </span>
+          )}
+          {isRecording && (
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-[20px] border-2 border-rose-400/70 animate-ping pointer-events-none"
+            />
+          )}
+        </button>
+      )}
 
       {hint && !isRecording && phase !== 'sending' && (
         <div
           role="status"
           className="fixed left-1/2 -translate-x-1/2 z-50 clay clay-amber animate-pop-in px-4 py-2.5 max-w-[20rem] text-center"
-          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
+          style={{ bottom: floating ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
           <p className="text-xs font-black text-amber-900">{hint}</p>
         </div>
       )}
@@ -304,7 +331,7 @@ export default function VoiceButton({ onResult, autoStart = false, variant = 'ic
         <div
           role="alert"
           className="fixed left-1/2 -translate-x-1/2 z-50 clay clay-red animate-pop-in px-4 py-3 max-w-[20rem] flex items-start gap-2"
-          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
+          style={{ bottom: floating ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}>
           <p className="text-xs font-bold text-red-900 flex-1">{error}</p>
           <button
             type="button"
@@ -319,7 +346,7 @@ export default function VoiceButton({ onResult, autoStart = false, variant = 'ic
       {(isRecording || phase === 'sending') && (
         <div
           className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none"
-          style={{ bottom: variant === 'bar' ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+          style={{ bottom: floating ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
           <div className="clay animate-slide-up w-full max-w-sm px-4 py-3.5 flex items-center gap-3 pointer-events-auto">
             {phase === 'sending' ? (
               <>
