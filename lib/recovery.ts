@@ -7,6 +7,7 @@ const SCOPED_BASES = [
   'money_buddy_categories',
   'money_buddy_transfers',
   'money_buddy_recurring',
+  'money_buddy_subscriptions',
   'money_buddy_savings_goal',
   'money_buddy_budget',
   'money_buddy_streak',

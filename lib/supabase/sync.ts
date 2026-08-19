@@ -1,4 +1,5 @@
 import { Transaction, Wallet, Category, SpendCategory, WalletTransfer, RecurringRule, SavingsGoal, SplitGroup } from '../types';
+import type { Subscription } from '../subscriptions';
 import { getSupabase } from './client';
 
 function getUserId(): string | null {
@@ -29,6 +30,7 @@ function writeLocal(userId: string, data: {
   spendCategories: SpendCategory[];
   transfers: WalletTransfer[];
   recurring: RecurringRule[];
+  subscriptions: Subscription[];
   splits: SplitGroup[];
   goal: SavingsGoal | null;
   budget: number;
@@ -40,6 +42,7 @@ function writeLocal(userId: string, data: {
   localStorage.setItem(userKey('money_buddy_spend_categories', userId), JSON.stringify(data.spendCategories));
   localStorage.setItem(userKey('money_buddy_transfers', userId), JSON.stringify(data.transfers));
   localStorage.setItem(userKey('money_buddy_recurring', userId), JSON.stringify(data.recurring));
+  localStorage.setItem(userKey('money_buddy_subscriptions', userId), JSON.stringify(data.subscriptions));
   localStorage.setItem(userKey('money_buddy_splits', userId), JSON.stringify(data.splits));
   if (data.goal) {
     localStorage.setItem(userKey('money_buddy_savings_goal', userId), JSON.stringify(data.goal));
@@ -74,6 +77,7 @@ function readLocal(userId: string) {
     spendCategories: parse<SpendCategory[]>('money_buddy_spend_categories', []),
     transfers: parse<WalletTransfer[]>('money_buddy_transfers', []),
     recurring: parse<RecurringRule[]>('money_buddy_recurring', []),
+    subscriptions: parse<Subscription[]>('money_buddy_subscriptions', []),
     splits: parse<SplitGroup[]>('money_buddy_splits', []),
     goal: parse<SavingsGoal | null>('money_buddy_savings_goal', null),
     budget: Number(localStorage.getItem(userKey('money_buddy_budget', userId)) || 0),
@@ -86,6 +90,7 @@ function hasMeaningfulData(data: {
   categories: Category[];
   transfers: WalletTransfer[];
   recurring: RecurringRule[];
+  subscriptions: Subscription[];
   splits: SplitGroup[];
   goal: SavingsGoal | null;
 }): boolean {
@@ -94,6 +99,7 @@ function hasMeaningfulData(data: {
     data.categories.length > 0 ||
     data.transfers.length > 0 ||
     data.recurring.length > 0 ||
+    data.subscriptions.length > 0 ||
     data.splits.length > 0 ||
     data.goal != null
   );
@@ -107,13 +113,14 @@ export async function pullFromCloud(): Promise<boolean> {
 
   const localBeforePull = readLocal(userId);
 
-  const [txRes, walRes, catRes, spendCatRes, trRes, recRes, splitRes, goalRes, setRes] = await Promise.all([
+  const [txRes, walRes, catRes, spendCatRes, trRes, recRes, subRes, splitRes, goalRes, setRes] = await Promise.all([
     supabase.from('transactions').select('*').eq('user_id', userId),
     supabase.from('wallets').select('*').eq('user_id', userId),
     supabase.from('categories').select('*').eq('user_id', userId),
     supabase.from('spend_categories').select('*').eq('user_id', userId),
     supabase.from('category_transfers').select('*').eq('user_id', userId),
     supabase.from('recurring_rules').select('*').eq('user_id', userId),
+    supabase.from('subscriptions').select('*').eq('user_id', userId),
     supabase.from('split_groups').select('*').eq('user_id', userId),
     supabase.from('savings_goals').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
@@ -136,6 +143,7 @@ export async function pullFromCloud(): Promise<boolean> {
     categoryId: r.category_id ?? undefined,
     spendCategoryId: r.spend_category_id ?? undefined,
     recurringRuleId: r.recurring_rule_id ?? undefined,
+    subscriptionId: r.subscription_id ?? undefined,
     date: r.date,
     createdAt: r.created_at,
   }));
@@ -197,6 +205,33 @@ export async function pullFromCloud(): Promise<boolean> {
     linkedTransactionId: r.linked_transaction_id ?? undefined,
   }));
 
+  // Subscriptions table may not exist yet (migration not run) — keep local in that case
+  const subscriptions: Subscription[] = subRes.error
+    ? localBeforePull.subscriptions
+    : (subRes.data ?? []).map(r => ({
+        id: r.id,
+        name: r.name,
+        amount: r.amount,
+        currency: r.currency ?? 'INR',
+        cycle: r.cycle,
+        list: r.list,
+        category: r.category,
+        firstPayment: r.first_payment,
+        nextPayment: r.next_payment,
+        duration: r.duration ?? 'forever',
+        freeTrial: r.free_trial ?? false,
+        notifyDaysBefore: r.notify_days_before ?? 1,
+        emoji: r.emoji,
+        color: r.color,
+        cancelled: r.cancelled ?? false,
+        subscribedAt: r.subscribed_at,
+        history: r.history ?? [],
+        type: r.type ?? undefined,
+        walletId: r.wallet_id ?? undefined,
+        categoryId: r.category_id ?? undefined,
+        createdAt: r.created_at,
+      }));
+
   // Keep local splits when the split_groups table is missing (SQL not run) OR when it
   // exists but is empty while local has groups (freshly-created table must not wipe them)
   const keepLocalSplits =
@@ -240,13 +275,14 @@ export async function pullFromCloud(): Promise<boolean> {
     spendCategories: keepIfCloudEmpty(spendCategories, localBeforePull.spendCategories),
     transfers: keepIfCloudEmpty(transfers, localBeforePull.transfers),
     recurring: keepIfCloudEmpty(recurring, localBeforePull.recurring),
+    subscriptions: subRes.error ? subscriptions : keepIfCloudEmpty(subscriptions, localBeforePull.subscriptions),
     splits,
     goal: goal ?? localBeforePull.goal,
     budget: setRes.data?.monthly_budget ?? localBeforePull.budget,
     onboardingDone: (setRes.data?.onboarding_done ?? false) || localBeforePull.onboardingDone,
   };
 
-  const cloudEmpty = !hasMeaningfulData({ transactions, categories, transfers, recurring, splits, goal });
+  const cloudEmpty = !hasMeaningfulData({ transactions, categories, transfers, recurring, subscriptions, splits, goal });
   const localHasData = hasMeaningfulData(localBeforePull);
 
   // Never wipe local entries when Supabase is empty (failed sync, grace period, new account).
@@ -319,13 +355,17 @@ export async function pushToCloud(): Promise<boolean> {
     }));
 
     let { error } = await supabase.from('transactions').upsert(
-      rows.map((row, i) => ({ ...row, spend_category_id: local.transactions[i].spendCategoryId ?? null })),
+      rows.map((row, i) => ({
+        ...row,
+        spend_category_id: local.transactions[i].spendCategoryId ?? null,
+        subscription_id: local.transactions[i].subscriptionId ?? null,
+      })),
       { onConflict: 'user_id,id' },
     );
     if (error) {
-      // spend_category_id may not exist yet (migration not run) — never let one new
-      // column stop every entry from syncing
-      console.error('transaction sync with spend_category_id failed, retrying without it', error);
+      // spend_category_id / subscription_id may not exist yet (migration not run) —
+      // never let one new column stop every entry from syncing
+      console.error('transaction sync with new columns failed, retrying without them', error);
       ({ error } = await supabase.from('transactions').upsert(rows, { onConflict: 'user_id,id' }));
     }
     if (error) throw error;
@@ -480,6 +520,50 @@ export async function pushToCloud(): Promise<boolean> {
       const { error: delErr } = await supabase.from('recurring_rules').delete().eq('user_id', userId).in('id', remove);
       if (delErr) throw delErr;
     }
+  }
+
+  // Subscriptions — tolerate a missing table so sync of everything else still works
+  try {
+    if (local.subscriptions.length) {
+      const { error } = await supabase.from('subscriptions').upsert(
+        local.subscriptions.map(s => ({
+          id: s.id,
+          user_id: userId,
+          name: s.name,
+          amount: s.amount,
+          currency: s.currency,
+          cycle: s.cycle,
+          list: s.list,
+          category: s.category,
+          first_payment: s.firstPayment,
+          next_payment: s.nextPayment,
+          duration: s.duration,
+          free_trial: s.freeTrial,
+          notify_days_before: s.notifyDaysBefore,
+          emoji: s.emoji,
+          color: s.color,
+          cancelled: s.cancelled,
+          subscribed_at: s.subscribedAt,
+          history: s.history,
+          type: s.type ?? null,
+          wallet_id: s.walletId ?? null,
+          category_id: s.categoryId ?? null,
+          created_at: s.createdAt,
+        })),
+        { onConflict: 'user_id,id' },
+      );
+      if (error) throw error;
+    }
+    const keep = new Set(local.subscriptions.map(s => s.id));
+    const { data, error } = await supabase.from('subscriptions').select('id').eq('user_id', userId);
+    if (error) throw error;
+    const remove = (data ?? []).map(r => r.id).filter(id => !keep.has(id));
+    if (remove.length) {
+      const { error: delErr } = await supabase.from('subscriptions').delete().eq('user_id', userId).in('id', remove);
+      if (delErr) throw delErr;
+    }
+  } catch (err) {
+    console.error('subscriptions sync failed (run the SQL migration?)', err);
   }
 
   // Split groups — tolerate a missing table so sync of everything else still works

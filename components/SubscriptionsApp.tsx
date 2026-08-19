@@ -6,6 +6,9 @@ import {
   cancelSubscription, yearlyCost, daysUntil, guessSubCategory, nextPaymentFrom,
   totalSpentEstimate, subscribedLabel, CatalogItem,
 } from '@/lib/subscriptions';
+import { TxType, Wallet, Category } from '@/lib/types';
+import { getWallets } from '@/lib/wallets';
+import { getCategories } from '@/lib/categories';
 import { fmt } from '@/lib/insights';
 import { getProfile } from '@/lib/profile';
 import { notificationsEnabled, showNotification } from '@/lib/notifications';
@@ -56,6 +59,18 @@ export default function SubscriptionsApp({
   const [draftNotify, setDraftNotify] = useState(1);
   const [draftTrial, setDraftTrial] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Auto-add to ledger (replaces the old recurring rules) — opt-in, off by default
+  const [draftAutoAdd, setDraftAutoAdd] = useState(false);
+  const [draftType, setDraftType] = useState<TxType>('expense');
+  const [draftWalletId, setDraftWalletId] = useState('');
+  const [draftCategoryId, setDraftCategoryId] = useState('');
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    setWallets(getWallets());
+    setCategories(getCategories());
+  }, []);
 
   function reload() {
     const list = getSubscriptions().map(s => {
@@ -137,6 +152,10 @@ export default function SubscriptionsApp({
     setDraftList('personal');
     setDraftNotify(1);
     setDraftTrial(false);
+    setDraftAutoAdd(false);
+    setDraftType('expense');
+    setDraftWalletId(wallets[0]?.id ?? '');
+    setDraftCategoryId('');
     setView('add-form');
   }
 
@@ -152,6 +171,10 @@ export default function SubscriptionsApp({
     setDraftList('personal');
     setDraftNotify(1);
     setDraftTrial(false);
+    setDraftAutoAdd(false);
+    setDraftType('expense');
+    setDraftWalletId(wallets[0]?.id ?? '');
+    setDraftCategoryId('');
     if (editId) {
       const s = getSubscriptions().find(x => x.id === editId);
       if (s) {
@@ -165,6 +188,10 @@ export default function SubscriptionsApp({
         setDraftList(s.list);
         setDraftNotify(s.notifyDaysBefore);
         setDraftTrial(s.freeTrial);
+        setDraftAutoAdd(!!(s.type && s.walletId));
+        setDraftType(s.type ?? 'expense');
+        setDraftWalletId(s.walletId ?? wallets[0]?.id ?? '');
+        setDraftCategoryId(s.categoryId ?? '');
       }
     }
     setView('add-form');
@@ -173,6 +200,9 @@ export default function SubscriptionsApp({
   function saveDraft() {
     const amount = Number(draftAmount);
     if (!draftName.trim() || !(amount > 0)) return;
+    const ledgerFields = draftAutoAdd
+      ? { type: draftType, walletId: draftWalletId || wallets[0]?.id, categoryId: draftCategoryId || undefined }
+      : { type: undefined, walletId: undefined, categoryId: undefined };
     if (editingId) {
       updateSubscription(editingId, {
         name: draftName.trim(),
@@ -186,6 +216,7 @@ export default function SubscriptionsApp({
         notifyDaysBefore: draftNotify,
         emoji: draftEmoji,
         color: draftColor,
+        ...ledgerFields,
       });
       setEditingId(null);
     } else {
@@ -203,6 +234,7 @@ export default function SubscriptionsApp({
         emoji: draftEmoji,
         color: draftColor,
         cancelled: false,
+        ...ledgerFields,
       });
     }
     reload();
@@ -291,6 +323,7 @@ export default function SubscriptionsApp({
               <span className="text-zinc-400 text-sm">Cycle</span>
               <select value={draftCycle} onChange={e => setDraftCycle(e.target.value as SubCycle)}
                 className="rounded-full bg-zinc-800 px-3 py-1.5 text-sm font-bold text-white outline-none">
+                <option value="daily">Every day</option>
                 <option value="weekly">Every week</option>
                 <option value="monthly">Every month</option>
                 <option value="yearly">Every year</option>
@@ -333,6 +366,53 @@ export default function SubscriptionsApp({
               <option value={7}>1 week before</option>
             </select>
           </div>
+
+          <div className="rounded-[16px] bg-[#16161c] divide-y divide-white/8 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3.5 min-h-[52px]">
+              <div>
+                <p className="text-white text-sm font-semibold">Auto-add to ledger</p>
+                <p className="text-zinc-500 text-xs">Adds a transaction every cycle, like rent or an EMI.</p>
+              </div>
+              <button type="button" role="switch" aria-checked={draftAutoAdd} onClick={() => setDraftAutoAdd(v => !v)}
+                className={`relative h-7 w-12 shrink-0 rounded-full ${draftAutoAdd ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
+                <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${draftAutoAdd ? 'left-5' : 'left-0.5'}`} />
+              </button>
+            </div>
+            {draftAutoAdd && (
+              <>
+                <div className="flex items-center justify-between px-4 py-3.5 min-h-[52px]">
+                  <span className="text-zinc-400 text-sm">Type</span>
+                  <div className="flex gap-1.5">
+                    {([
+                      { t: 'expense' as TxType, label: 'Expense' },
+                      { t: 'income' as TxType, label: 'Income' },
+                      { t: 'investment' as TxType, label: 'Invest' },
+                    ]).map(({ t, label }) => (
+                      <button key={t} type="button" onClick={() => setDraftType(t)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold ${draftType === t ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3.5 min-h-[52px]">
+                  <span className="text-zinc-400 text-sm">Wallet</span>
+                  <select value={draftWalletId} onChange={e => setDraftWalletId(e.target.value)}
+                    className="rounded-full bg-zinc-800 px-3 py-1.5 text-sm font-bold text-white outline-none">
+                    {wallets.map(w => <option key={w.id} value={w.id}>{w.emoji} {w.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3.5 min-h-[52px]">
+                  <span className="text-zinc-400 text-sm">Type (pocket)</span>
+                  <select value={draftCategoryId} onChange={e => setDraftCategoryId(e.target.value)}
+                    className="rounded-full bg-zinc-800 px-3 py-1.5 text-sm font-bold text-white outline-none">
+                    <option value="">None</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -355,12 +435,15 @@ export default function SubscriptionsApp({
         </div>
         <div className="mx-4 rounded-[16px] bg-[#16121f] divide-y divide-white/8 overflow-hidden">
           {[
-            ['Billing', selected.cycle === 'weekly' ? 'Weekly' : selected.cycle === 'yearly' ? 'Yearly' : 'Monthly'],
+            ['Billing', selected.cycle === 'daily' ? 'Daily' : selected.cycle === 'weekly' ? 'Weekly' : selected.cycle === 'yearly' ? 'Yearly' : 'Monthly'],
             ['Next payment', fmtDate(selected.nextPayment)],
             ['Total spent', fmt(totalSpentEstimate(selected))],
             ['Subscribed', subscribedLabel(selected)],
             ['Category', CATEGORY_LABELS[selected.category]],
             ['List', selected.list === 'business' ? 'Business' : 'Personal'],
+            ['Ledger', selected.type && selected.walletId
+              ? `Auto-added · ${wallets.find(w => w.id === selected.walletId)?.name ?? selected.walletId}`
+              : 'Reminder only'],
           ].map(([l, v]) => (
             <div key={l} className="flex justify-between px-4 py-3.5 text-sm min-h-[48px]">
               <span className="text-zinc-500">{l}</span>

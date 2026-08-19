@@ -468,7 +468,7 @@ export default function SettingsPanel({ onClose, onChange, onReset, embedded }: 
           <div className="clay p-3 flex flex-col gap-2">
             <p className="text-xs font-black text-rose-400 uppercase tracking-wide">Danger zone</p>
             <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-              Wipe every entry, transfer, recurring rule and split group. Wallets, types and spending categories stay. This cannot be undone.
+              Wipe every entry, transfer, subscription and split group. Wallets, types and spending categories stay. This cannot be undone.
             </p>
             {resetMsg && <p className="text-xs font-bold text-emerald-700">{resetMsg}</p>}
             <button
@@ -492,7 +492,7 @@ export default function SettingsPanel({ onClose, onChange, onReset, embedded }: 
             onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-black text-stone-800 text-center">Reset everything?</h3>
             <p className="text-sm font-semibold text-stone-500 text-center leading-relaxed">
-              All entries, transfers, recurring rules and split groups will be deleted from this device and the cloud. Wallets, types and spending categories stay.
+              All entries, transfers, subscriptions and split groups will be deleted from this device and the cloud. Wallets, types and spending categories stay.
             </p>
             <p className="text-xs font-black text-rose-500 text-center">This cannot be undone.</p>
             <div className="flex gap-2 mt-1">

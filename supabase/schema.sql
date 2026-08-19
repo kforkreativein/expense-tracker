@@ -29,6 +29,7 @@ create table if not exists public.transactions (
   date date not null,
   created_at bigint not null,
   recurring_rule_id text,
+  subscription_id text,
   primary key (user_id, id)
 );
 
@@ -102,6 +103,8 @@ alter table public.category_transfers enable row level security;
 create policy "transfers_all_own" on public.category_transfers for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Recurring rules
+-- Legacy — replaced by public.subscriptions below. Kept only so old rows
+-- still migrate correctly on a device that hasn't opened the app in a while.
 create table if not exists public.recurring_rules (
   id text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -118,6 +121,37 @@ create table if not exists public.recurring_rules (
 
 alter table public.recurring_rules enable row level security;
 create policy "recurring_all_own" on public.recurring_rules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Subscriptions — renewal tracker that can also auto-add a transaction each
+-- billing cycle (type + wallet_id set). Replaces recurring_rules.
+create table if not exists public.subscriptions (
+  id text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  amount integer not null,
+  currency text not null default 'INR',
+  cycle text not null default 'monthly',
+  list text not null default 'personal',
+  category text not null default 'other',
+  first_payment date not null,
+  next_payment date not null,
+  duration text not null default 'forever',
+  free_trial boolean not null default false,
+  notify_days_before integer not null default 1,
+  emoji text not null default '💳',
+  color text not null default '#7C3AED',
+  cancelled boolean not null default false,
+  subscribed_at date not null,
+  history jsonb not null default '[]',
+  type text,
+  wallet_id text,
+  category_id text,
+  created_at bigint not null,
+  primary key (user_id, id)
+);
+
+alter table public.subscriptions enable row level security;
+create policy "subscriptions_all_own" on public.subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Split groups (entries stored as JSON — mirrors localStorage shape)
 create table if not exists public.split_groups (

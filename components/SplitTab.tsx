@@ -295,15 +295,22 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
    * money still needs a tap to confirm, same as every other voice entry in the app.
    */
   function handleVoiceResult(result: VoiceResult) {
-    if (!selectedGroup) return;
-    const allNames = ['me', ...selectedGroup.members];
+    let group = selectedGroup;
+    if (!group) {
+      if (activeGroups.length !== 1) {
+        alert('Open a group first, then use the orb to add a split bill by voice.');
+        return;
+      }
+      group = activeGroups[0];
+    }
+    const allNames = ['me', ...group.members];
 
     if (result.intent === 'split' && result.splitEntry && result.splitEntry.amount > 0) {
       const se = result.splitEntry;
       const paidBy = allNames.includes(se.paidBy) ? se.paidBy : 'me';
       let splitAmong = se.splitAmong.filter(p => allNames.includes(p));
       if (splitAmong.length === 0) splitAmong = allNames;
-      openNewEntry(selectedGroup);
+      openNewEntry(group);
       setEntryDesc(se.description.trim() || 'Expense');
       setEntryAmount(String(Math.round(se.amount)));
       setEntryPaidBy(paidBy);
@@ -314,7 +321,7 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
 
     if (result.intent === 'entries' && result.entries.length === 1 && result.entries[0].amount > 0) {
       const e = result.entries[0];
-      openNewEntry(selectedGroup);
+      openNewEntry(group);
       setEntryDesc(e.description.trim() || 'Expense');
       setEntryAmount(String(Math.round(e.amount)));
       setEntryPaidBy('me');
@@ -1162,9 +1169,8 @@ export default function SplitTab({ onClose, onExpenseAdded, initialGroupId, embe
       </div>
   );
 
-  const showOrb = voiceEnabled && !!selectedGroup && view !== 'list' && view !== 'new-group';
-  const orb = showOrb && selectedGroup && (
-    <FloatingVoiceOrb onResult={handleVoiceResult} splitMembers={selectedGroup.members} />
+  const orb = voiceEnabled && (
+    <FloatingVoiceOrb onResult={handleVoiceResult} splitMembers={selectedGroup?.members ?? []} />
   );
 
   if (embedded) return <>{body}{orb}</>;

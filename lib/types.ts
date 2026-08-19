@@ -70,6 +70,7 @@ export interface SavingsGoal {
   label: string;
 }
 
+/** @deprecated Recurring rules were replaced by Subscription (lib/subscriptions.ts) — kept only so old cloud rows still type-check during the one-time migration. */
 export interface RecurringRule {
   id: string;
   type: TxType;
@@ -94,7 +95,10 @@ export interface Transaction {
   categoryId?: string;
   /** What the money was spent on — see SpendCategory */
   spendCategoryId?: string;
+  /** @deprecated set only on transactions auto-added by the old recurring rules; new auto-added rows use subscriptionId */
   recurringRuleId?: string;
+  /** Set when this transaction was auto-added by a Subscription's billing cycle */
+  subscriptionId?: string;
   date: string;
   createdAt: number;
 }

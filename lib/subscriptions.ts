@@ -1,7 +1,10 @@
+import { TxType, Transaction } from './types';
 import { userStorageKey } from './auth';
 import { scheduleCloudSync } from './supabase/sync';
+import { addTransaction, getTransactions, deleteTransaction } from './storage';
+import { walletToPaymentMode } from './wallets';
 
-export type SubCycle = 'weekly' | 'monthly' | 'yearly';
+export type SubCycle = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type SubList = 'personal' | 'business' | 'all';
 export type SubCategory =
   | 'streaming'
@@ -31,6 +34,14 @@ export interface Subscription {
   color: string;
   cancelled: boolean;
   subscribedAt: string;
+  /**
+   * Set all three to auto-add a transaction every cycle (replaces the old
+   * recurring rules). Leave unset and this stays a renewal reminder only.
+   */
+  type?: TxType;
+  walletId?: string;
+  /** Type/pocket (Personal, Business, …) for the auto-added transaction */
+  categoryId?: string;
   history: { date: string; note: string }[];
   createdAt: number;
 }
@@ -108,17 +119,21 @@ export function addDays(iso: string, days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Advance a date by one billing cycle. */
+export function advanceCycle(iso: string, cycle: SubCycle): string {
+  if (cycle === 'daily') return addDays(iso, 1);
+  if (cycle === 'weekly') return addDays(iso, 7);
+  if (cycle === 'yearly') return addDays(iso, 365);
+  const d = new Date(iso + 'T12:00:00');
+  d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function nextPaymentFrom(first: string, cycle: SubCycle, from = localToday()): string {
   let next = first;
   let guard = 0;
   while (next < from && guard < 600) {
-    if (cycle === 'weekly') next = addDays(next, 7);
-    else if (cycle === 'yearly') next = addDays(next, 365);
-    else {
-      const d = new Date(next + 'T12:00:00');
-      d.setMonth(d.getMonth() + 1);
-      next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
+    next = advanceCycle(next, cycle);
     guard += 1;
   }
   return next;
@@ -126,6 +141,7 @@ export function nextPaymentFrom(first: string, cycle: SubCycle, from = localToda
 
 export function yearlyCost(sub: Subscription): number {
   if (sub.cancelled) return 0;
+  if (sub.cycle === 'daily') return sub.amount * 365;
   if (sub.cycle === 'weekly') return sub.amount * 52;
   if (sub.cycle === 'yearly') return sub.amount;
   return sub.amount * 12;
@@ -172,10 +188,141 @@ export function cancelSubscription(id: string) {
   });
 }
 
+/**
+ * Call on app load — for every active subscription with a type + wallet set,
+ * auto-adds a transaction for each due cycle and advances nextPayment.
+ * Subscriptions without a wallet stay pure renewal reminders (no transaction).
+ */
+export function applyDueSubscriptions(): number {
+  const today = localToday();
+  const subs = getSubscriptions();
+  if (!subs.length) return 0;
+
+  const existing = getTransactions();
+  const seen = new Set(
+    existing.filter(t => t.subscriptionId).map(t => `${t.subscriptionId}|${t.date.slice(0, 10)}`),
+  );
+
+  let count = 0;
+  const updated = subs.map(s => {
+    if (s.cancelled || !s.type || !s.walletId) return s;
+    let sub = { ...s };
+    let guard = 0;
+    while (sub.nextPayment <= today && guard++ < 400) {
+      const dueDate = sub.nextPayment;
+      const key = `${sub.id}|${dueDate}`;
+      if (!seen.has(key)) {
+        const pm = walletToPaymentMode(sub.walletId!);
+        addTransaction({
+          id: crypto.randomUUID(),
+          type: sub.type!,
+          amount: sub.amount,
+          description: sub.name,
+          walletId: sub.walletId,
+          categoryId: sub.categoryId,
+          subscriptionId: sub.id,
+          paymentMode: pm.paymentMode,
+          bank: pm.bank,
+          date: dueDate,
+          createdAt: Date.now(),
+        } as Transaction);
+        seen.add(key);
+        count++;
+      }
+      sub = { ...sub, nextPayment: advanceCycle(dueDate, sub.cycle) };
+    }
+    return sub;
+  });
+
+  save(updated);
+  return count;
+}
+
+/** Remove duplicate auto-added subscription transactions (same sub + date), keeping the earliest. */
+export function dedupeSubscriptionTransactions(): number {
+  const txns = getTransactions();
+  const keep = new Map<string, string>();
+  const remove: string[] = [];
+
+  const sorted = [...txns].sort((a, b) => a.createdAt - b.createdAt);
+  for (const t of sorted) {
+    if (!t.subscriptionId) continue;
+    const key = `${t.subscriptionId}|${t.date.slice(0, 10)}`;
+    if (keep.has(key)) remove.push(t.id);
+    else keep.set(key, t.id);
+  }
+
+  for (const id of remove) deleteTransaction(id);
+  return remove.length;
+}
+
+interface LegacyRecurringRule {
+  id: string;
+  type: TxType;
+  amount: number;
+  description: string;
+  walletId: string;
+  categoryId?: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  nextDue: string;
+}
+
+const LEGACY_RECURRING_KEY = 'money_buddy_recurring';
+
+/**
+ * One-time move: recurring rules become subscriptions. Reuses each rule's id
+ * as the new subscription id, so this is safe to run on more than one device
+ * or more than once — a rule that already has a matching subscription is
+ * skipped. Clears the legacy local key once absorbed.
+ */
+export function migrateRecurringToSubscriptions(): number {
+  if (typeof window === 'undefined') return 0;
+  let rules: LegacyRecurringRule[] = [];
+  try {
+    rules = JSON.parse(localStorage.getItem(userStorageKey(LEGACY_RECURRING_KEY)) ?? '[]');
+  } catch {
+    rules = [];
+  }
+  if (!rules.length) return 0;
+
+  const existingIds = new Set(getSubscriptions().map(s => s.id));
+  const toAdd = rules.filter(r => !existingIds.has(r.id));
+  if (toAdd.length) {
+    const migrated: Subscription[] = toAdd.map(r => ({
+      id: r.id,
+      name: r.description || (r.type === 'income' ? 'Recurring income' : r.type === 'investment' ? 'Recurring investment' : 'Recurring expense'),
+      amount: r.amount,
+      currency: 'INR',
+      cycle: r.frequency,
+      list: 'personal',
+      category: guessSubCategory(r.description || ''),
+      firstPayment: r.nextDue,
+      nextPayment: r.nextDue,
+      duration: 'forever',
+      freeTrial: false,
+      notifyDaysBefore: 1,
+      emoji: r.type === 'income' ? '💰' : r.type === 'investment' ? '📈' : '🔄',
+      color: r.type === 'income' ? '#10B981' : r.type === 'investment' ? '#3B82F6' : '#7C3AED',
+      cancelled: false,
+      subscribedAt: r.nextDue,
+      history: [{ date: localToday(), note: 'Migrated from recurring rules' }],
+      type: r.type,
+      walletId: r.walletId,
+      categoryId: r.categoryId,
+      createdAt: Date.now(),
+    }));
+    save([...getSubscriptions(), ...migrated]);
+  }
+
+  localStorage.removeItem(userStorageKey(LEGACY_RECURRING_KEY));
+  return toAdd.length;
+}
+
 export function totalSpentEstimate(sub: Subscription): number {
   const start = new Date(sub.subscribedAt + 'T12:00:00');
   const end = new Date();
   const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1);
+  if (sub.cycle === 'daily') return Math.round(sub.amount * (months * 30.44));
   if (sub.cycle === 'weekly') return Math.round(sub.amount * (months * 4.33));
   if (sub.cycle === 'yearly') return Math.round(sub.amount * Math.max(1, months / 12));
   return Math.round(sub.amount * months);

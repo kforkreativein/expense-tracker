@@ -1,10 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Transaction, TxType, Frequency, Wallet, Category, SpendCategory } from '@/lib/types';
+import { Transaction, TxType, Wallet, Category, SpendCategory } from '@/lib/types';
 import { getWallets, addWallet, legacyWalletId, walletToPaymentMode } from '@/lib/wallets';
 import { getCategories, suggestedWalletForCategory } from '@/lib/categories';
 import { getSpendCategories, matchSpendCategory } from '@/lib/spendCategories';
-import { findRuleForTransaction, syncRuleForTransaction } from '@/lib/recurring';
 import EmojiPicker from './EmojiPicker';
 
 interface Props {
@@ -13,18 +12,11 @@ interface Props {
   isDraft?: boolean;
   onSave: (txn: Transaction) => void;
   onCancel?: () => void;
-  onRecurringChange?: () => void;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const FREQ_LABELS: Record<Frequency, string> = {
-  daily: '📅 Daily',
-  weekly: '📆 Weekly',
-  monthly: '🗓️ Monthly',
-};
-
-export default function TransactionForm({ initial, isDraft = false, onSave, onCancel, onRecurringChange }: Props) {
+export default function TransactionForm({ initial, isDraft = false, onSave, onCancel }: Props) {
   const [type, setType] = useState<TxType>(initial?.type ?? 'expense');
   const [amount, setAmount] = useState(initial?.amount?.toString() ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -38,8 +30,6 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletEmoji, setNewWalletEmoji] = useState('💳');
 
-  const [recurring, setRecurring] = useState(false);
-  const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
   const [spendCategories, setSpendCategories] = useState<SpendCategory[]>([]);
@@ -65,9 +55,6 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       setSpendCategoryId(initial.spendCategoryId ?? '');
       setSpendPickedByHand(!!initial.spendCategoryId);
       setSpendAutoMatched(false);
-      const rule = isDraft ? undefined : findRuleForTransaction(initial);
-      setRecurring(!!rule);
-      setFrequency(rule?.frequency ?? 'monthly');
     } else {
       setType('expense');
       setAmount('');
@@ -79,8 +66,6 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       setSpendCategoryId('');
       setSpendPickedByHand(false);
       setSpendAutoMatched(false);
-      setRecurring(false);
-      setFrequency('monthly');
     }
   }, [initial, isDraft]);
 
@@ -140,13 +125,12 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
       categoryId: (type === 'income' || type === 'expense') && categoryId ? categoryId : undefined,
       spendCategoryId: type === 'expense' && spendCategoryId ? spendCategoryId : undefined,
       recurringRuleId: initial?.recurringRuleId,
+      subscriptionId: initial?.subscriptionId,
       date,
       createdAt: initial?.createdAt ?? Date.now(),
     };
 
     onSave(txn);
-    syncRuleForTransaction(txn, recurring, frequency);
-    onRecurringChange?.();
   }
 
   const isEdit = !!initial && !isDraft;
@@ -161,7 +145,7 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
   return (
     <form onSubmit={handleSubmit} className="clay p-5 flex flex-col gap-4 max-h-[88dvh] overflow-y-auto overscroll-contain">
       <h2 className="text-lg font-black text-stone-700 text-center">
-        {isEdit ? `✏️ Edit Entry${recurring ? ' 🔄' : ''}` : isDraft ? '🎙️ Check & Save' : '➕ New Entry'}
+        {isEdit ? `✏️ Edit Entry${initial?.subscriptionId ? ' 🔄' : ''}` : isDraft ? '🎙️ Check & Save' : '➕ New Entry'}
       </h2>
 
       <div className="grid grid-cols-3 gap-2">
@@ -318,34 +302,11 @@ export default function TransactionForm({ initial, isDraft = false, onSave, onCa
         className="clay w-full px-4 py-3 text-base font-semibold text-stone-700 bg-transparent outline-none min-h-[44px]"
       />
 
-      <div className="flex flex-col gap-2">
-        <button type="button"
-          onClick={() => setRecurring(v => !v)}
-          className={`clay-btn flex items-center justify-between px-4 py-3 rounded-[14px] font-bold text-sm min-h-[48px] transition-all ${
-            recurring ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-500 border border-stone-200 shadow-none'
-          }`}>
-          <span>🔄 {isEdit ? 'Recurring rule' : 'Make this recurring'}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-black ${recurring ? 'bg-violet-200 text-violet-800' : 'bg-stone-200 text-stone-400'}`}>
-            {recurring ? 'ON' : 'OFF'}
-          </span>
-        </button>
-        {recurring && (
-          <div className="grid grid-cols-3 gap-2 animate-pop-in">
-            {(['daily', 'weekly', 'monthly'] as Frequency[]).map(f => (
-              <button key={f} type="button"
-                onClick={() => setFrequency(f)}
-                className={`clay-btn py-3 rounded-[12px] font-bold text-sm min-h-[48px] transition-all ${
-                  frequency === f ? 'clay-purple text-violet-900' : 'bg-stone-100 text-stone-400 border border-stone-200 shadow-none'
-                }`}>
-                {FREQ_LABELS[f]}
-              </button>
-            ))}
-          </div>
-        )}
-        {recurring && isEdit && (
-          <p className="text-[11px] font-semibold text-violet-700 px-1">Changes update the recurring rule for future entries.</p>
-        )}
-      </div>
+      {isEdit && initial?.subscriptionId && (
+        <p className="text-[11px] font-semibold text-violet-700 px-1">
+          🔄 Auto-added by a subscription. Edit it from Financial Tools → Subscriptions.
+        </p>
+      )}
 
       {error && <p className="text-red-500 font-bold text-sm text-center">{error}</p>}
 

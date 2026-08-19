@@ -4,7 +4,7 @@ import { Transaction, Category, WalletTransfer, SplitGroup } from '@/lib/types';
 import { getTransactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, migrateTransactionsToWallets } from '@/lib/storage';
 import { getSplitGroups, adjustForSettledSplits } from '@/lib/splits';
 import { getSplitEnabled, setSplitEnabled } from '@/lib/settings';
-import { applyDueRecurring, dedupeRecurringTransactions } from '@/lib/recurring';
+import { applyDueSubscriptions, dedupeSubscriptionTransactions, migrateRecurringToSubscriptions } from '@/lib/subscriptions';
 import { userStorageKey, restoreAuth } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { getCategories } from '@/lib/categories';
@@ -57,8 +57,7 @@ export default function Home() {
   const [budget, setBudget] = useState(0);
   const [walletFilter, setWalletFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('all');
-  const [recurringRefresh, setRecurringRefresh] = useState(0);
-  const [recurringAdded, setRecurringAdded] = useState(0);
+  const [subsAdded, setSubsAdded] = useState(0);
   const [search, setSearch] = useState('');
   const [splitGroupId, setSplitGroupId] = useState<string | undefined>(undefined);
   const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
@@ -87,11 +86,6 @@ export default function Home() {
   }, []);
   const reloadCategories = useCallback(() => setCategories(getCategories()), []);
   const reloadTransfers = useCallback(() => setTransfers(getTransfers()), []);
-
-  const handleRecurringChange = useCallback(() => {
-    refresh();
-    setRecurringRefresh(n => n + 1);
-  }, [refresh]);
 
   const viewTransactions = useMemo(
     () => filterTransactionsForView(transactions, viewMode),
@@ -158,9 +152,10 @@ export default function Home() {
     registerServiceWorker();
     migrateTransactionsToWallets();
     migrateTransfersToWallets();
-    const removed = dedupeRecurringTransactions();
-    const added = applyDueRecurring();
-    if (added > 0) setRecurringAdded(added);
+    migrateRecurringToSubscriptions();
+    const removed = dedupeSubscriptionTransactions();
+    const added = applyDueSubscriptions();
+    if (added > 0) setSubsAdded(added);
     else if (removed > 0) refresh();
     refresh();
     reloadCategories();
@@ -303,7 +298,7 @@ export default function Home() {
     setBudget(0);
     setStreak(0);
     setPreviousStreak(0);
-    setRecurringAdded(0);
+    setSubsAdded(0);
     setSearch('');
     setWalletFilter(null);
     setViewMode('all');
@@ -339,21 +334,21 @@ export default function Home() {
         <RecoveryBanner
           currentCount={transactions.length}
           onRestored={() => {
-            dedupeRecurringTransactions();
-            const added = applyDueRecurring();
-            if (added > 0) setRecurringAdded(added);
+            dedupeSubscriptionTransactions();
+            const added = applyDueSubscriptions();
+            if (added > 0) setSubsAdded(added);
             refresh();
             reloadCategories();
             reloadTransfers();
           }}
         />
 
-        {recurringAdded > 0 && (
+        {subsAdded > 0 && (
           <div className="clay clay-amber animate-pop-in flex items-center justify-between px-4 py-3 gap-2 min-w-0 overflow-hidden">
             <span className="font-black text-amber-900 text-sm min-w-0 flex-1 leading-snug">
-              🔄 {recurringAdded} recurring {recurringAdded === 1 ? 'entry' : 'entries'} auto-added!
+              🔄 {subsAdded} subscription {subsAdded === 1 ? 'entry' : 'entries'} auto-added!
             </span>
-            <button type="button" onClick={() => setRecurringAdded(0)}
+            <button type="button" onClick={() => setSubsAdded(0)}
               className="clay-btn text-amber-700 font-black text-xs px-2 py-1 rounded-[8px] bg-amber-100">
               ✕
             </button>
@@ -444,7 +439,6 @@ export default function Home() {
                     onDelete={handleDelete}
                     walletFilter={walletFilter}
                     categoryFilter={categoryFilter}
-                    onRecurringChange={handleRecurringChange}
                     search={search}
                     onSearchChange={setSearch}
                     hideSearchBar
@@ -491,7 +485,6 @@ export default function Home() {
             onRefresh={refresh}
             walletFilter={walletFilter}
             onWalletFilter={id => setWalletFilter(prev => prev === id ? null : id)}
-            recurringRefresh={recurringRefresh}
             voiceEnabled={voiceEnabled}
             onRequestVoice={() => {
               setSubVoiceMode(true);
@@ -544,7 +537,6 @@ export default function Home() {
             <TransactionForm
               onSave={handleSave}
               onCancel={() => setShowForm(false)}
-              onRecurringChange={handleRecurringChange}
             />
           </div>
         </div>

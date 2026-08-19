@@ -424,7 +424,7 @@ const DEFAULT_CARDS = [
   { id:'f25', col:'done', title:'Spending categories (separate from Type)', meta:'Food / Transport / Shopping with own monthly limit; old categories renamed "Type" since they drive the View bar', tag:'Feature' },
   { id:'f26', col:'done', title:'Voice entry — hold to talk',           meta:'Hold 🎤 or double-tap for hands-free; Groq Whisper handles English + Hindi, form opens pre-filled; several amounts stack as editable cards', tag:'Feature' },
   { id:'f27', col:'done', title:'Voice questions',                      meta:'"How much did I spend on food this month" — totalled on the device, nothing but category names leaves the phone', tag:'Feature' },
-  { id:'f28', col:'done', title:'Full reset from Settings',             meta:'Confirm modal; clears entries/transfers/recurring/splits on device + cloud; wallets & categories stay', tag:'Feature' },
+  { id:'f28', col:'done', title:'Full reset from Settings',             meta:'Confirm modal; clears entries/transfers/subscriptions/splits on device + cloud; wallets & categories stay', tag:'Feature' },
   { id:'f29', col:'done', title:'Auto spend-category from note',        meta:'Zomato/chai/uber etc. pick Food/Transport automatically; manual chip wins', tag:'Feature' },
   { id:'f30', col:'done', title:'Dark dashboard home + sheet',          meta:'Pie split, budget bar, month modal, expandable transaction sheet', tag:'UI/UX' },
   { id:'f31', col:'done', title:'Dock: Split tab + capture menu',       meta:'3rd tab is Split; green + opens mic/photo/PDF/manual', tag:'UI/UX' },
@@ -433,7 +433,8 @@ const DEFAULT_CARDS = [
   { id:'f34', col:'done', title:'Streak once per local day',            meta:'Local calendar date + smarter cloud merge; popup once/day', tag:'Bugfix' },
   { id:'f35', col:'done', title:'Premium Settings hub',                 meta:'Account home, profile, categories, notifications, backup — no locks', tag:'UI/UX' },
   { id:'f36', col:'done', title:'Subscriptions + calendar',             meta:'Hub from Tools; voice/catalog add; filters; renewal calendar', tag:'Feature' },
-  { id:'f37', col:'done', title:'Voice-add a split bill',               meta:'Orb also lives inside an open Split group; "₹100 paid by Pratham split equally" prefills the Add Expense form for a one-tap confirm', tag:'Feature' },
+  { id:'f37', col:'done', title:'Voice-add a split bill',               meta:'Orb works anywhere in Split — auto-picks the group when there is only one; "₹100 paid by Pratham split equally" prefills the Add Expense form for a one-tap confirm', tag:'Feature' },
+  { id:'f38', col:'done', title:'Recurring rules retired for Subscriptions', meta:'Subscriptions now optionally auto-add a transaction each cycle (type + wallet) or stay a pure reminder; old recurring rules migrate automatically and subscriptions now sync to the cloud', tag:'Feature' },
 ];
 
 function loadCards() {

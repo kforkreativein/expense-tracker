@@ -39,6 +39,7 @@ const LEGACY_KEYS = [
   'money_buddy_txns',
   'money_buddy_wallets',
   'money_buddy_recurring',
+  'money_buddy_subscriptions',
   'money_buddy_name',
   'money_buddy_budget',
   'onboarding_done',

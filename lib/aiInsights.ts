@@ -156,13 +156,13 @@ export function buildAiInsights(
     });
   }
 
-  const recurring = expenses.filter(t => t.recurringRuleId);
+  const recurring = expenses.filter(t => t.recurringRuleId || t.subscriptionId);
   if (recurring.length > 0) {
     const recSum = recurring.reduce((s, t) => s + t.amount, 0);
     cards.push({
       id: 'recurring',
-      body: `${recurring.length} recurring charge${recurring.length === 1 ? '' : 's'} this month totaling ${fmt(recSum)}.`,
-      highlight: 'Review recurring rules in Financial Tools if anything looks duplicated.',
+      body: `${recurring.length} subscription charge${recurring.length === 1 ? '' : 's'} this month totaling ${fmt(recSum)}.`,
+      highlight: 'Review your subscriptions in Financial Tools if anything looks duplicated.',
     });
   }
 

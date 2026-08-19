@@ -4,7 +4,6 @@ import { Transaction, Wallet } from '@/lib/types';
 import { getWallets, legacyWalletId } from '@/lib/wallets';
 import { getCategories, getCategoryById } from '@/lib/categories';
 import { getSpendCategoryById } from '@/lib/spendCategories';
-import { findRuleForTransaction } from '@/lib/recurring';
 import { getTransfers, getInternalTransferTxnIds, isInternalTransferTxn, sumRealExpense, sumRealIncome } from '@/lib/transfers';
 import { getSplitGroups } from '@/lib/splits';
 import TransactionForm from './TransactionForm';
@@ -41,7 +40,6 @@ export default function TransactionList({
   onDelete,
   walletFilter,
   categoryFilter,
-  onRecurringChange,
   search: searchProp,
   onSearchChange,
   hideSearchBar = false,
@@ -52,7 +50,6 @@ export default function TransactionList({
   onDelete: (id: string) => void;
   walletFilter?: string | null;
   categoryFilter?: string | null;
-  onRecurringChange?: () => void;
   search?: string;
   onSearchChange?: (value: string) => void;
   hideSearchBar?: boolean;
@@ -263,9 +260,9 @@ export default function TransactionList({
                             </span>
                           );
                         })()}
-                        {!isSplit && findRuleForTransaction(txn) && (
+                        {!isSplit && (txn.recurringRuleId || txn.subscriptionId) && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                            🔄 Recurring
+                            🔄 Subscription
                           </span>
                         )}
                         {isTransfer && (
@@ -328,7 +325,6 @@ export default function TransactionList({
               initial={editing}
               onSave={txn => { onUpdate(txn); setEditing(null); }}
               onCancel={() => setEditing(null)}
-              onRecurringChange={onRecurringChange}
             />
           </div>
         </div>

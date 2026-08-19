@@ -4,7 +4,7 @@ import { Transaction } from '@/lib/types';
 import { userStorageKey } from '@/lib/auth';
 import { scheduleCloudSync } from '@/lib/supabase/sync';
 import { fmt } from '@/lib/insights';
-import BottomTools from './BottomTools';
+import { getCategoryById } from '@/lib/categories';
 import WalletBar from './WalletBar';
 import SubscriptionsApp from './SubscriptionsApp';
 
@@ -24,7 +24,6 @@ interface Props {
   onRefresh: () => void;
   walletFilter: string | null;
   onWalletFilter: (id: string) => void;
-  recurringRefresh?: number;
   voiceEnabled?: boolean;
   onRequestVoice?: () => void;
   voiceSubDrafts?: { name: string; amount: number }[];
@@ -44,8 +43,23 @@ function saveCommitments(list: Commitment[]) {
   scheduleCloudSync();
 }
 
+function exportCSV(transactions: Transaction[]) {
+  const headers = ['Date', 'Type', 'Amount', 'Description', 'Wallet', 'Category'];
+  const rows = transactions
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(t => {
+      const cat = t.categoryId ? getCategoryById(t.categoryId)?.name ?? '' : '';
+      return [t.date, t.type, t.amount, `"${(t.description ?? '').replace(/"/g, '""')}"`, t.walletId ?? t.paymentMode, cat];
+    });
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `money-buddy-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+}
+
 export default function FinancialTools({
-  transactions, budget, expense, onSetBudget, onRefresh, walletFilter, onWalletFilter, recurringRefresh = 0,
+  transactions, budget, expense, onSetBudget, onRefresh, walletFilter, onWalletFilter,
   voiceEnabled, onRequestVoice, voiceSubDrafts, onVoiceSubDraftsConsumed,
 }: Props) {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -254,13 +268,15 @@ export default function FinancialTools({
         </div>
       </section>
 
-      <BottomTools
-        transactions={transactions}
-        budget={budget}
-        onSetBudget={onSetBudget}
-        onRefresh={onRefresh}
-        recurringRefresh={recurringRefresh}
-      />
+      <section>
+        <p className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">Data</p>
+        <button type="button" onClick={() => exportCSV(transactions)} disabled={transactions.length === 0}
+          className="flex w-full items-center gap-3 rounded-[16px] bg-[#1c1c1e] border border-white/8 px-4 py-3.5 text-left min-h-[52px] disabled:opacity-40">
+          <span className="text-lg">📥</span>
+          <span className="flex-1 font-semibold text-white">Export CSV</span>
+          <span className="text-zinc-500">›</span>
+        </button>
+      </section>
     </div>
   );
 }
